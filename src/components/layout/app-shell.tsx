@@ -1,5 +1,9 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Activity, BadgeCheck, LayoutDashboard, ListChecks, Logs, Sparkles, Wallet } from "lucide-react";
-import { ShellNavLink } from "@/components/layout/shell-nav-link";
+import { cn } from "@/lib/utils/cn";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -18,6 +22,9 @@ export function AppShell({
   walletBar?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const searchParams = useSearchParams();
+  const query = searchParams.toString();
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.15),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(249,115,22,0.18),_transparent_28%),linear-gradient(180deg,_#fffdf7,_#f3f7f6)]">
       <div className="mx-auto flex min-h-screen w-full max-w-[1600px] gap-6 px-4 py-6 lg:px-6">
@@ -33,15 +40,22 @@ export function AppShell({
           </div>
           <nav className="mt-10 space-y-2">
             {navigation.map((item) => {
+              const Icon = item.icon;
               const active = currentPath.startsWith(item.href);
+              const targetHref = query ? `${item.href}?${query}` : item.href;
+
               return (
-                <ShellNavLink
+                <Link
                   key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  icon={item.icon}
-                  active={active}
-                />
+                  href={targetHref}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
+                    active ? "bg-white text-slate-950" : "text-slate-300 hover:bg-slate-900 hover:text-white",
+                  )}
+                >
+                  <Icon className="size-4" />
+                  {item.label}
+                </Link>
               );
             })}
           </nav>

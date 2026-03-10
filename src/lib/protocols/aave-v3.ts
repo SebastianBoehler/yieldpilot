@@ -5,7 +5,7 @@ import { encodeFunctionData, erc20Abi, formatUnits, parseUnits } from "viem";
 import { createPublicClient, http } from "viem";
 import type { PublicClient } from "viem";
 import { CHAIN_CONFIGS, RAY, AAVE_PROTOCOL_KEY, AAVE_PROTOCOL_LABEL, USD_PRICE_DECIMALS } from "@/lib/config/constants";
-import type { ChainConfig, PortfolioPosition, SupportedAssetKey, TransactionPlanStep, YieldOpportunity } from "@/types/domain";
+import type { ChainConfig, PortfolioPosition, TransactionPlanStep, YieldOpportunity } from "@/types/domain";
 import { formatUnitsToNumber } from "@/lib/utils/number";
 
 type ReserveConfigurationData = [
@@ -30,8 +30,8 @@ type ReserveDataView = {
   isFrozen: boolean;
   liquidityIndex: bigint;
   liquidityRate: bigint;
-  aTokenAddress: `0x${string}`;
-  variableDebtTokenAddress: `0x${string}`;
+  aTokenAddress?: `0x${string}`;
+  variableDebtTokenAddress?: `0x${string}`;
   availableLiquidity: bigint;
   totalAToken: bigint;
   totalVariableDebt: bigint;
@@ -55,7 +55,7 @@ type UserReserveData = [
 ];
 
 const CHAIN_BY_ID = new Map(CHAIN_CONFIGS.map((chain) => [chain.id, chain]));
-const reserveCache = new Map<number, { at: number; data: YieldOpportunity[] }>();
+const reserveCache = new Map<string, { at: number; data: YieldOpportunity[] }>();
 const CACHE_TTL_MS = 30_000;
 
 function getClient(chain: ChainConfig): PublicClient {
@@ -77,12 +77,16 @@ function calculateUsdBalance(amount: bigint, decimals: number, priceUsd: number)
   return formatUnitsToNumber(amount, decimals) * priceUsd;
 }
 
-async function loadChainReserves(chain: ChainConfig): Promise<ReserveDataView[]> {
+async function loadChainReserves(
+  chain: ChainConfig,
+  assetMap: Record<string, `0x${string}`> = chain.assets,
+): Promise<ReserveDataView[]> {
   const publicClient = getClient(chain);
-  const assets = Object.entries(chain.assets) as Array<[SupportedAssetKey, `0x${string}`]>;
+  const assets = Object.entries(assetMap) as Array<[string, `0x${string}`]>;
+  const reserveViews: ReserveDataView[] = [];
 
-  const reserveViews = await Promise.all(
-    assets.map(async ([assetSymbol, assetAddress]) => {
+  for (const [assetSymbol, assetAddress] of assets) {
+    try {
       const [reserveConfiguration, reserveData, assetPrice] = await Promise.all([
         publicClient.readContract({
           address: chain.protocolDataProvider,
@@ -103,12 +107,6 @@ async function loadChainReserves(chain: ChainConfig): Promise<ReserveDataView[]>
           args: [assetAddress],
         }) as Promise<bigint>,
       ]);
-      const [aTokenAddress, , variableDebtTokenAddress] = await publicClient.readContract({
-        address: chain.protocolDataProvider,
-        abi: protocolDataProviderArtifact.abi,
-        functionName: "getReserveTokensAddresses",
-        args: [assetAddress],
-      }) as [`0x${string}`, `0x${string}`, `0x${string}`];
 
       const [
         reserveDecimals,
@@ -144,7 +142,7 @@ async function loadChainReserves(chain: ChainConfig): Promise<ReserveDataView[]>
       const totalSupplyUsd = calculateUsdBalance(totalAToken, normalizedDecimals, priceUsd);
       const availableLiquidityUsd = calculateUsdBalance(availableLiquidity, normalizedDecimals, priceUsd);
 
-      return {
+      const reserveView = {
         assetAddress,
         symbol: assetSymbol,
         decimals: normalizedDecimals,
@@ -153,8 +151,6 @@ async function loadChainReserves(chain: ChainConfig): Promise<ReserveDataView[]>
         isFrozen,
         liquidityIndex,
         liquidityRate,
-        aTokenAddress,
-        variableDebtTokenAddress,
         availableLiquidity,
         totalAToken,
         totalVariableDebt,
@@ -164,20 +160,30 @@ async function loadChainReserves(chain: ChainConfig): Promise<ReserveDataView[]>
         tvlUsd: totalSupplyUsd,
         priceUsd,
       } satisfies ReserveDataView;
-    }),
-  );
+
+      reserveViews.push(reserveView);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to load reserve ${assetSymbol} on ${chain.label}: ${message}`);
+    }
+  }
 
   return reserveViews.filter((reserve) => reserve.isActive && !reserve.isFrozen);
 }
 
-async function getChainReserveUniverse(chain: ChainConfig): Promise<YieldOpportunity[]> {
-  const cached = reserveCache.get(chain.id);
+async function getChainReserveUniverse(
+  chain: ChainConfig,
+  assetMap: Record<string, `0x${string}`> = chain.assets,
+  cacheKeySuffix = "stable",
+): Promise<YieldOpportunity[]> {
+  const cacheKey = `${chain.id}:${cacheKeySuffix}`;
+  const cached = reserveCache.get(cacheKey);
 
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     return cached.data;
   }
 
-  const reservesData = await loadChainReserves(chain);
+  const reservesData = await loadChainReserves(chain, assetMap);
 
   const opportunities = reservesData
     .map((reserve) => {
@@ -205,11 +211,13 @@ async function getChainReserveUniverse(chain: ChainConfig): Promise<YieldOpportu
           aTokenAddress: reserve.aTokenAddress,
           poolAddress: chain.poolAddress,
           variableDebtTokenAddress: reserve.variableDebtTokenAddress,
+          sourceLabel: "Aave RPC",
+          executionSupported: true,
         },
       } satisfies YieldOpportunity;
     });
 
-  reserveCache.set(chain.id, {
+  reserveCache.set(cacheKey, {
     at: Date.now(),
     data: opportunities,
   });
@@ -221,9 +229,24 @@ export async function getAaveStableOpportunities(): Promise<YieldOpportunity[]> 
   const results = await Promise.all(
     CHAIN_CONFIGS.map(async (chain) => {
       try {
-        return await getChainReserveUniverse(chain);
+        return await getChainReserveUniverse(chain, chain.assets, "stable");
       } catch (error) {
         console.error(`Failed to load Aave reserve universe for ${chain.label}.`, error);
+        return [];
+      }
+    }),
+  );
+
+  return results.flat().sort((left, right) => right.apy - left.apy);
+}
+
+export async function getAaveDiscoveryOpportunities(): Promise<YieldOpportunity[]> {
+  const results = await Promise.all(
+    CHAIN_CONFIGS.map(async (chain) => {
+      try {
+        return await getChainReserveUniverse(chain, chain.discoveryAssets, "discovery");
+      } catch (error) {
+        console.error(`Failed to load Aave discovery markets for ${chain.label}.`, error);
         return [];
       }
     }),

@@ -31,8 +31,8 @@ export default async function DashboardPage({
         <Panel className="space-y-6">
           <SectionHeading
             eyebrow="Treasury overview"
-            title="Stablecoin allocation at a glance"
-            description="YieldPilot tracks the live wallet and Aave lending balances on each supported chain, then compares the current carry with the best routed alternative."
+            title="Cross-chain treasury allocation at a glance"
+            description="YieldPilot tracks the live wallet balances it can see, surfaces Aave and Kamino yield markets across the supported chains, and compares the current carry with the best routed alternative."
           />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Portfolio value" value={formatUsd(snapshot.totalPortfolioUsd)} />
@@ -65,7 +65,7 @@ export default async function DashboardPage({
             <p className="text-sm leading-6 text-slate-600">
               {snapshot.walletType === "solana"
                 ? "Solana wallet support currently focuses on portfolio visibility through Jupiter's official portfolio APIs. Automated yield execution still targets the supported EVM routes."
-                : "The agent loop can be run on demand from the UI. In a Vercel preview, this is the fastest way to inspect the live Aave opportunity set and the current stablecoin exposure across supported chains."}
+                : "The agent loop can be run on demand from the UI. In a Vercel preview, this is the fastest way to inspect the live multi-asset opportunity set and the current supported onchain exposure across chains."}
             </p>
           </div>
           <RunAgentButton walletAddress={snapshot.walletAddress} walletType={snapshot.walletType as ConnectedWalletType | undefined} />

@@ -1,4 +1,5 @@
-import { getAaveStableOpportunities, getAaveStablePositions } from "@/lib/protocols/aave-v3";
+import { getAaveStablePositions } from "@/lib/protocols/aave-v3";
+import { getDisplayOpportunityUniverse } from "@/lib/opportunities/universe";
 import { scheduleLabel } from "@/lib/utils/time";
 import type { ConnectedWalletType, DashboardSnapshot } from "@/types/domain";
 import { env } from "@/lib/config/env";
@@ -11,6 +12,7 @@ export async function getLiveDashboardSnapshot(params: {
   walletType?: ConnectedWalletType;
 }): Promise<DashboardSnapshot> {
   const { walletAddress, walletType = "evm" } = params;
+  const displayOpportunities = await getDisplayOpportunityUniverse().catch(() => []);
 
   if (!walletAddress) {
     return {
@@ -21,9 +23,10 @@ export async function getLiveDashboardSnapshot(params: {
       pendingApprovals: 0,
       autonomousModeEnabled: false,
       positions: [],
-      opportunityCount: 0,
+      opportunityCount: displayOpportunities.length,
       currentAllocation: [],
       byChain: [],
+      bestOpportunity: displayOpportunities[0],
       loopStatus: {
         scheduleLabel: scheduleLabel(env.AGENT_LOOP_INTERVAL_MINUTES),
       },
@@ -31,12 +34,16 @@ export async function getLiveDashboardSnapshot(params: {
   }
 
   if (walletType === "solana") {
-    return getLiveSolanaDashboardSnapshot(walletAddress);
+    const snapshot = await getLiveSolanaDashboardSnapshot(walletAddress);
+    return {
+      ...snapshot,
+      opportunityCount: displayOpportunities.length,
+      bestOpportunity: displayOpportunities[0],
+    };
   }
 
-  const [positions, opportunities, persisted] = await Promise.all([
+  const [positions, persisted] = await Promise.all([
     getAaveStablePositions(walletAddress as `0x${string}`),
-    getAaveStableOpportunities(),
     getDashboardSnapshot(walletAddress).catch(() => undefined),
   ]);
   const tokenSymbols = await resolveLifiTokenSymbols([
@@ -45,7 +52,7 @@ export async function getLiveDashboardSnapshot(params: {
       address: position.assetAddress,
       fallbackSymbol: position.assetSymbol,
     })),
-    ...opportunities.slice(0, 1).map((opportunity) => ({
+    ...displayOpportunities.slice(0, 1).map((opportunity) => ({
       chain: opportunity.chainId,
       address: opportunity.assetAddress,
       fallbackSymbol: opportunity.assetSymbol,
@@ -56,12 +63,12 @@ export async function getLiveDashboardSnapshot(params: {
     assetSymbol:
       tokenSymbols.get(getLifiTokenRefKey(position.chainId, position.assetAddress)) ?? position.assetSymbol,
   }));
-  const bestOpportunity = opportunities[0]
+  const bestOpportunity = displayOpportunities[0]
     ? {
-        ...opportunities[0],
+        ...displayOpportunities[0],
         assetSymbol:
-          tokenSymbols.get(getLifiTokenRefKey(opportunities[0].chainId, opportunities[0].assetAddress))
-          ?? opportunities[0].assetSymbol,
+          tokenSymbols.get(getLifiTokenRefKey(displayOpportunities[0].chainId, displayOpportunities[0].assetAddress))
+          ?? displayOpportunities[0].assetSymbol,
       }
     : undefined;
 
@@ -97,7 +104,7 @@ export async function getLiveDashboardSnapshot(params: {
       positionType: position.positionType,
       metadata: position.metadata,
     })),
-    opportunityCount: opportunities.length,
+    opportunityCount: displayOpportunities.length,
     currentAllocation: resolvedPositions.map((position) => ({
       label: `${position.assetSymbol} · ${position.protocolLabel}`,
       value: position.balanceUsd,

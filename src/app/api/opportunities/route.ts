@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { selectBestCandidate } from "@/lib/orchestration/rebalance";
-import { getAaveStableOpportunities } from "@/lib/protocols/aave-v3";
+import { getDisplayOpportunityUniverse } from "@/lib/opportunities/universe";
 import { buildDefaultStrategyPolicy } from "@/server/services/strategy-service";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   if (!wallet || walletType === "solana") {
     return NextResponse.json({
       positions: [],
-      opportunities: await getAaveStableOpportunities(),
+      opportunities: await getDisplayOpportunityUniverse(),
       candidates: [],
     });
   }
@@ -25,5 +25,8 @@ export async function GET(request: Request) {
     policy: buildDefaultStrategyPolicy(),
   });
 
-  return NextResponse.json(data);
+  return NextResponse.json({
+    ...data,
+    opportunities: await getDisplayOpportunityUniverse(),
+  });
 }

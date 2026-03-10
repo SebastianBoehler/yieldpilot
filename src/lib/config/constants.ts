@@ -28,6 +28,14 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
       USDT: AaveV3Arbitrum.ASSETS.USDT.UNDERLYING,
       DAI: AaveV3Arbitrum.ASSETS.DAI.UNDERLYING,
     },
+    discoveryAssets: {
+      USDC: AaveV3Arbitrum.ASSETS.USDC.UNDERLYING,
+      USDT: AaveV3Arbitrum.ASSETS.USDT.UNDERLYING,
+      DAI: AaveV3Arbitrum.ASSETS.DAI.UNDERLYING,
+      WETH: AaveV3Arbitrum.ASSETS.WETH.UNDERLYING,
+      WBTC: AaveV3Arbitrum.ASSETS.WBTC.UNDERLYING,
+      wstETH: AaveV3Arbitrum.ASSETS.wstETH.UNDERLYING,
+    },
   },
   {
     id: 8453,
@@ -43,6 +51,12 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
     uiPoolDataProvider: AaveV3Base.UI_POOL_DATA_PROVIDER,
     assets: {
       USDC: AaveV3Base.ASSETS.USDC.UNDERLYING,
+    },
+    discoveryAssets: {
+      USDC: AaveV3Base.ASSETS.USDC.UNDERLYING,
+      WETH: AaveV3Base.ASSETS.WETH.UNDERLYING,
+      cbBTC: AaveV3Base.ASSETS.cbBTC.UNDERLYING,
+      wstETH: AaveV3Base.ASSETS.wstETH.UNDERLYING,
     },
   },
   {
@@ -61,6 +75,14 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
       USDC: AaveV3Optimism.ASSETS.USDC.UNDERLYING,
       USDT: AaveV3Optimism.ASSETS.USDT.UNDERLYING,
       DAI: AaveV3Optimism.ASSETS.DAI.UNDERLYING,
+    },
+    discoveryAssets: {
+      USDC: AaveV3Optimism.ASSETS.USDC.UNDERLYING,
+      USDT: AaveV3Optimism.ASSETS.USDT.UNDERLYING,
+      DAI: AaveV3Optimism.ASSETS.DAI.UNDERLYING,
+      WETH: AaveV3Optimism.ASSETS.WETH.UNDERLYING,
+      WBTC: AaveV3Optimism.ASSETS.WBTC.UNDERLYING,
+      wstETH: AaveV3Optimism.ASSETS.wstETH.UNDERLYING,
     },
   },
 ];

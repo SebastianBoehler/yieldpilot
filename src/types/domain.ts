@@ -1,8 +1,8 @@
 import type { ApprovalStatus, DecisionStatus, RiskProfile, RunStatus, StrategyMode, TransactionStatus } from "@prisma/client";
 
-export type SupportedProtocolKey = "aave-v3";
+export type SupportedProtocolKey = "aave-v3" | "kamino-lend";
 export type SupportedAssetKey = "USDC" | "USDT" | "DAI";
-export type SupportedChainKey = "arbitrum" | "base" | "optimism";
+export type SupportedChainKey = "arbitrum" | "base" | "optimism" | "solana";
 export type ConnectedWalletType = "evm" | "solana";
 
 export type ChainConfig = {
@@ -18,6 +18,7 @@ export type ChainConfig = {
   oracleAddress: `0x${string}`;
   uiPoolDataProvider: `0x${string}`;
   assets: Record<string, `0x${string}`>;
+  discoveryAssets: Record<string, `0x${string}`>;
 };
 
 export type AssetMetadata = {

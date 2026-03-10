@@ -1,57 +1,62 @@
-import uiPoolDataProviderArtifact from "@aave/periphery-v3/artifacts/contracts/misc/interfaces/IUiPoolDataProviderV3.sol/IUiPoolDataProviderV3.json";
+import aaveOracleArtifact from "@aave/core-v3/artifacts/contracts/interfaces/IAaveOracle.sol/IAaveOracle.json";
+import protocolDataProviderArtifact from "@aave/core-v3/artifacts/contracts/misc/AaveProtocolDataProvider.sol/AaveProtocolDataProvider.json";
 import poolArtifact from "@aave/core-v3/artifacts/contracts/interfaces/IPool.sol/IPool.json";
 import { encodeFunctionData, erc20Abi, formatUnits, parseUnits } from "viem";
 import { createPublicClient, http } from "viem";
 import type { PublicClient } from "viem";
-import { CHAIN_CONFIGS, RAY, AAVE_PROTOCOL_KEY, AAVE_PROTOCOL_LABEL } from "@/lib/config/constants";
-import type { ChainConfig, PortfolioPosition, TransactionPlanStep, YieldOpportunity } from "@/types/domain";
+import { CHAIN_CONFIGS, RAY, AAVE_PROTOCOL_KEY, AAVE_PROTOCOL_LABEL, USD_PRICE_DECIMALS } from "@/lib/config/constants";
+import type { ChainConfig, PortfolioPosition, SupportedAssetKey, TransactionPlanStep, YieldOpportunity } from "@/types/domain";
 import { formatUnitsToNumber } from "@/lib/utils/number";
 
-type ReserveData = {
-  underlyingAsset: `0x${string}`;
-  name: string;
+type ReserveConfigurationData = [
+  decimals: bigint,
+  ltv: bigint,
+  liquidationThreshold: bigint,
+  liquidationBonus: bigint,
+  reserveFactor: bigint,
+  usageAsCollateralEnabled: boolean,
+  borrowingEnabled: boolean,
+  stableBorrowRateEnabled: boolean,
+  isActive: boolean,
+  isFrozen: boolean,
+];
+
+type ReserveDataView = {
+  assetAddress: `0x${string}`;
   symbol: string;
-  decimals: bigint;
-  reserveFactor: bigint;
+  decimals: number;
+  reserveFactor: number;
   isActive: boolean;
   isFrozen: boolean;
   liquidityIndex: bigint;
   liquidityRate: bigint;
   aTokenAddress: `0x${string}`;
+  variableDebtTokenAddress: `0x${string}`;
   availableLiquidity: bigint;
-  totalScaledVariableDebt: bigint;
-  priceInMarketReferenceCurrency: bigint;
-  borrowCap: bigint;
-  supplyCap: bigint;
-  eModeCategoryId: number;
-  flashLoanEnabled: boolean;
+  totalAToken: bigint;
+  totalVariableDebt: bigint;
+  totalStableDebt: bigint;
+  totalSupplyUsd: number;
+  availableLiquidityUsd: number;
+  tvlUsd: number;
+  priceUsd: number;
 };
 
-type BaseCurrencyInfo = {
-  marketReferenceCurrencyUnit: bigint;
-  marketReferenceCurrencyPriceInUsd: bigint;
-  networkBaseTokenPriceInUsd: bigint;
-  networkBaseTokenPriceDecimals: number;
-};
-
-type UserReserveData = {
-  underlyingAsset: `0x${string}`;
-  scaledATokenBalance: bigint;
-  usageAsCollateralEnabledOnUser: boolean;
-  stableBorrowRate: bigint;
-  scaledVariableDebt: bigint;
-  principalStableDebt: bigint;
-  stableBorrowLastUpdateTimestamp: bigint;
-};
+type UserReserveData = [
+  currentATokenBalance: bigint,
+  currentStableDebt: bigint,
+  currentVariableDebt: bigint,
+  principalStableDebt: bigint,
+  scaledVariableDebt: bigint,
+  stableBorrowRate: bigint,
+  liquidityRate: bigint,
+  stableRateLastUpdated: number,
+  usageAsCollateralEnabled: boolean,
+];
 
 const CHAIN_BY_ID = new Map(CHAIN_CONFIGS.map((chain) => [chain.id, chain]));
 const reserveCache = new Map<number, { at: number; data: YieldOpportunity[] }>();
 const CACHE_TTL_MS = 30_000;
-
-const isStableReserve = (symbol: string) => {
-  const normalized = symbol.toUpperCase();
-  return normalized.startsWith("USDC") || normalized.startsWith("USDT") || normalized.startsWith("DAI");
-};
 
 function getClient(chain: ChainConfig): PublicClient {
   return createPublicClient({
@@ -60,17 +65,109 @@ function getClient(chain: ChainConfig): PublicClient {
   });
 }
 
-function calculatePriceUsd(priceInReference: bigint, baseCurrencyInfo: BaseCurrencyInfo) {
-  const referencePriceUsd = Number(baseCurrencyInfo.marketReferenceCurrencyPriceInUsd) / 10 ** 8;
-  return (Number(priceInReference) / Number(baseCurrencyInfo.marketReferenceCurrencyUnit)) * referencePriceUsd;
-}
-
-function calculateTvlUsd(totalSupply: bigint, decimals: bigint, priceUsd: number) {
-  return formatUnitsToNumber(totalSupply, Number(decimals)) * priceUsd;
+function calculatePriceUsd(price: bigint) {
+  return Number(price) / 10 ** USD_PRICE_DECIMALS;
 }
 
 function calculateApy(liquidityRate: bigint) {
   return (Number(liquidityRate) / Number(RAY)) * 100;
+}
+
+function calculateUsdBalance(amount: bigint, decimals: number, priceUsd: number) {
+  return formatUnitsToNumber(amount, decimals) * priceUsd;
+}
+
+async function loadChainReserves(chain: ChainConfig): Promise<ReserveDataView[]> {
+  const publicClient = getClient(chain);
+  const assets = Object.entries(chain.assets) as Array<[SupportedAssetKey, `0x${string}`]>;
+
+  const reserveViews = await Promise.all(
+    assets.map(async ([assetSymbol, assetAddress]) => {
+      const [reserveConfiguration, reserveData, assetPrice] = await Promise.all([
+        publicClient.readContract({
+          address: chain.protocolDataProvider,
+          abi: protocolDataProviderArtifact.abi,
+          functionName: "getReserveConfigurationData",
+          args: [assetAddress],
+        }) as Promise<ReserveConfigurationData>,
+        publicClient.readContract({
+          address: chain.protocolDataProvider,
+          abi: protocolDataProviderArtifact.abi,
+          functionName: "getReserveData",
+          args: [assetAddress],
+        }) as Promise<[bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, number]>,
+        publicClient.readContract({
+          address: chain.oracleAddress,
+          abi: aaveOracleArtifact.abi,
+          functionName: "getAssetPrice",
+          args: [assetAddress],
+        }) as Promise<bigint>,
+      ]);
+      const [aTokenAddress, , variableDebtTokenAddress] = await publicClient.readContract({
+        address: chain.protocolDataProvider,
+        abi: protocolDataProviderArtifact.abi,
+        functionName: "getReserveTokensAddresses",
+        args: [assetAddress],
+      }) as [`0x${string}`, `0x${string}`, `0x${string}`];
+
+      const [
+        reserveDecimals,
+        ,
+        ,
+        ,
+        reserveFactor,
+        ,
+        ,
+        ,
+        isActive,
+        isFrozen,
+      ] = reserveConfiguration;
+
+      const [
+        unbacked,
+        ,
+        totalAToken,
+        totalStableDebt,
+        totalVariableDebt,
+        liquidityRate,
+        ,
+        ,
+        ,
+        liquidityIndex,
+      ] = reserveData;
+
+      const availableLiquidity = totalAToken > totalStableDebt + totalVariableDebt + unbacked
+        ? totalAToken - totalStableDebt - totalVariableDebt - unbacked
+        : 0n;
+      const priceUsd = calculatePriceUsd(assetPrice);
+      const normalizedDecimals = Number(reserveDecimals);
+      const totalSupplyUsd = calculateUsdBalance(totalAToken, normalizedDecimals, priceUsd);
+      const availableLiquidityUsd = calculateUsdBalance(availableLiquidity, normalizedDecimals, priceUsd);
+
+      return {
+        assetAddress,
+        symbol: assetSymbol,
+        decimals: normalizedDecimals,
+        reserveFactor: Number(reserveFactor) / 100,
+        isActive,
+        isFrozen,
+        liquidityIndex,
+        liquidityRate,
+        aTokenAddress,
+        variableDebtTokenAddress,
+        availableLiquidity,
+        totalAToken,
+        totalVariableDebt,
+        totalStableDebt,
+        totalSupplyUsd,
+        availableLiquidityUsd,
+        tvlUsd: totalSupplyUsd,
+        priceUsd,
+      } satisfies ReserveDataView;
+    }),
+  );
+
+  return reserveViews.filter((reserve) => reserve.isActive && !reserve.isFrozen);
 }
 
 async function getChainReserveUniverse(chain: ChainConfig): Promise<YieldOpportunity[]> {
@@ -80,46 +177,34 @@ async function getChainReserveUniverse(chain: ChainConfig): Promise<YieldOpportu
     return cached.data;
   }
 
-  const publicClient = getClient(chain);
-  const [reservesData, baseCurrencyInfo] = await publicClient.readContract({
-    address: chain.uiPoolDataProvider,
-    abi: uiPoolDataProviderArtifact.abi,
-    functionName: "getReservesData",
-    args: [chain.poolAddressesProvider],
-  }) as [ReserveData[], BaseCurrencyInfo];
+  const reservesData = await loadChainReserves(chain);
 
   const opportunities = reservesData
-    .filter((reserve) => reserve.isActive && !reserve.isFrozen && isStableReserve(reserve.symbol))
     .map((reserve) => {
-      const priceUsd = calculatePriceUsd(reserve.priceInMarketReferenceCurrency, baseCurrencyInfo);
-      const totalSupply = reserve.availableLiquidity + reserve.totalScaledVariableDebt;
-      const tvlUsd = calculateTvlUsd(totalSupply, reserve.decimals, priceUsd);
       const apy = calculateApy(reserve.liquidityRate);
 
       return {
-        id: `${chain.id}:${reserve.underlyingAsset}`,
+        id: `${chain.id}:${reserve.assetAddress}`,
         protocol: AAVE_PROTOCOL_KEY,
         protocolLabel: AAVE_PROTOCOL_LABEL,
         chainId: chain.id,
         chainKey: chain.key,
         chainLabel: chain.label,
         assetSymbol: reserve.symbol,
-        assetAddress: reserve.underlyingAsset,
+        assetAddress: reserve.assetAddress,
         apy,
         liquidityRate: reserve.liquidityRate.toString(),
-        availableLiquidityUsd: calculateTvlUsd(reserve.availableLiquidity, reserve.decimals, priceUsd),
-        totalSupplyUsd: tvlUsd,
-        tvlUsd,
-        reserveFactor: Number(reserve.reserveFactor) / 100,
-        priceUsd,
-        riskPenalty: reserve.flashLoanEnabled ? 0.4 : 0.8,
+        availableLiquidityUsd: reserve.availableLiquidityUsd,
+        totalSupplyUsd: reserve.totalSupplyUsd,
+        tvlUsd: reserve.tvlUsd,
+        reserveFactor: reserve.reserveFactor,
+        priceUsd: reserve.priceUsd,
+        riskPenalty: 0.4,
         metadata: {
-          borrowCap: reserve.borrowCap.toString(),
-          supplyCap: reserve.supplyCap.toString(),
           liquidityIndex: reserve.liquidityIndex.toString(),
           aTokenAddress: reserve.aTokenAddress,
           poolAddress: chain.poolAddress,
-          eModeCategoryId: reserve.eModeCategoryId,
+          variableDebtTokenAddress: reserve.variableDebtTokenAddress,
         },
       } satisfies YieldOpportunity;
     });
@@ -152,75 +237,61 @@ export async function getAaveStablePositions(walletAddress: `0x${string}`): Prom
     CHAIN_CONFIGS.map(async (chain) => {
       try {
         const publicClient = getClient(chain);
-        const [reservesData, baseCurrencyInfo] = await publicClient.readContract({
-          address: chain.uiPoolDataProvider,
-          abi: uiPoolDataProviderArtifact.abi,
-          functionName: "getReservesData",
-          args: [chain.poolAddressesProvider],
-        }) as [ReserveData[], BaseCurrencyInfo];
+        const reservesData = await loadChainReserves(chain);
 
-        const [userReserves] = await publicClient.readContract({
-          address: chain.uiPoolDataProvider,
-          abi: uiPoolDataProviderArtifact.abi,
-          functionName: "getUserReservesData",
-          args: [chain.poolAddressesProvider, walletAddress],
-        }) as [UserReserveData[], number];
+        const lendingPositions = (
+          await Promise.all(
+            reservesData.map(async (reserve) => {
+              const userReserve = await publicClient.readContract({
+                address: chain.protocolDataProvider,
+                abi: protocolDataProviderArtifact.abi,
+                functionName: "getUserReserveData",
+                args: [reserve.assetAddress, walletAddress],
+              }) as UserReserveData;
 
-        const reserveByAsset = new Map(
-          reservesData.map((reserve) => [reserve.underlyingAsset.toLowerCase(), reserve]),
-        );
+              const currentBalance = userReserve[0];
+              if (currentBalance <= 0n) {
+                return undefined;
+              }
 
-        const lendingPositions = userReserves
-          .map((userReserve) => {
-            const reserve = reserveByAsset.get(userReserve.underlyingAsset.toLowerCase());
-            if (!reserve || !isStableReserve(reserve.symbol)) {
-              return undefined;
-            }
+              const apy = calculateApy(BigInt(userReserve[6] ?? reserve.liquidityRate));
 
-            const currentBalance = (userReserve.scaledATokenBalance * reserve.liquidityIndex) / RAY;
-            if (currentBalance <= 0n) {
-              return undefined;
-            }
+              return {
+                id: `${chain.id}:${reserve.assetAddress}:aave`,
+                walletAddress,
+                chainId: chain.id,
+                chainKey: chain.key,
+                chainLabel: chain.label,
+                protocol: AAVE_PROTOCOL_KEY,
+                protocolLabel: AAVE_PROTOCOL_LABEL,
+                assetSymbol: reserve.symbol,
+                assetAddress: reserve.assetAddress,
+                balance: currentBalance.toString(),
+                balanceFormatted: formatUnitsToNumber(currentBalance, reserve.decimals),
+                balanceUsd: formatUnitsToNumber(currentBalance, reserve.decimals) * reserve.priceUsd,
+                apy,
+                positionType: "lending",
+                metadata: {
+                  liquidityIndex: reserve.liquidityIndex.toString(),
+                  priceUsd: reserve.priceUsd,
+                  aTokenAddress: reserve.aTokenAddress,
+                },
+              } satisfies PortfolioPosition;
+            }),
+          )
+        ).filter(Boolean) as PortfolioPosition[];
 
-            const priceUsd = calculatePriceUsd(reserve.priceInMarketReferenceCurrency, baseCurrencyInfo);
-            const apy = calculateApy(reserve.liquidityRate);
-
-            return {
-              id: `${chain.id}:${reserve.underlyingAsset}:aave`,
-              walletAddress,
-              chainId: chain.id,
-              chainKey: chain.key,
-              chainLabel: chain.label,
-              protocol: AAVE_PROTOCOL_KEY,
-              protocolLabel: AAVE_PROTOCOL_LABEL,
-              assetSymbol: reserve.symbol,
-              assetAddress: reserve.underlyingAsset,
-              balance: currentBalance.toString(),
-              balanceFormatted: formatUnitsToNumber(currentBalance, Number(reserve.decimals)),
-              balanceUsd: formatUnitsToNumber(currentBalance, Number(reserve.decimals)) * priceUsd,
-              apy,
-              positionType: "lending",
-              metadata: {
-                liquidityIndex: reserve.liquidityIndex.toString(),
-                priceUsd,
-                aTokenAddress: reserve.aTokenAddress,
-              },
-            } satisfies PortfolioPosition;
-          })
-          .filter(Boolean) as PortfolioPosition[];
-
-        const stableReserves = reservesData.filter((reserve) => isStableReserve(reserve.symbol));
         const idleBalances = await publicClient.multicall({
           allowFailure: true,
-          contracts: stableReserves.map((reserve) => ({
-            address: reserve.underlyingAsset,
+          contracts: reservesData.map((reserve) => ({
+            address: reserve.assetAddress,
             abi: erc20Abi,
             functionName: "balanceOf",
             args: [walletAddress],
           })),
         });
 
-        const idlePositions = stableReserves
+        const idlePositions = reservesData
           .map((reserve, index) => {
             const result = idleBalances[index];
             const balance = result.status === "success" ? BigInt(result.result as bigint) : 0n;
@@ -228,10 +299,8 @@ export async function getAaveStablePositions(walletAddress: `0x${string}`): Prom
               return undefined;
             }
 
-            const priceUsd = calculatePriceUsd(reserve.priceInMarketReferenceCurrency, baseCurrencyInfo);
-
             return {
-              id: `${chain.id}:${reserve.underlyingAsset}:wallet`,
+              id: `${chain.id}:${reserve.assetAddress}:wallet`,
               walletAddress,
               chainId: chain.id,
               chainKey: chain.key,
@@ -239,14 +308,14 @@ export async function getAaveStablePositions(walletAddress: `0x${string}`): Prom
               protocol: "wallet",
               protocolLabel: "Wallet",
               assetSymbol: reserve.symbol,
-              assetAddress: reserve.underlyingAsset,
+              assetAddress: reserve.assetAddress,
               balance: balance.toString(),
-              balanceFormatted: formatUnitsToNumber(balance, Number(reserve.decimals)),
-              balanceUsd: formatUnitsToNumber(balance, Number(reserve.decimals)) * priceUsd,
+              balanceFormatted: formatUnitsToNumber(balance, reserve.decimals),
+              balanceUsd: formatUnitsToNumber(balance, reserve.decimals) * reserve.priceUsd,
               apy: 0,
               positionType: "idle",
               metadata: {
-                priceUsd,
+                priceUsd: reserve.priceUsd,
               },
             } satisfies PortfolioPosition;
           })

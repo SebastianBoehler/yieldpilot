@@ -15,6 +15,7 @@ export type ChainConfig = {
   poolAddress: `0x${string}`;
   poolAddressesProvider: `0x${string}`;
   protocolDataProvider: `0x${string}`;
+  oracleAddress: `0x${string}`;
   uiPoolDataProvider: `0x${string}`;
   assets: Record<string, `0x${string}`>;
 };

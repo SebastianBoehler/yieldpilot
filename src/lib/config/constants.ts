@@ -21,6 +21,7 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
     poolAddress: AaveV3Arbitrum.POOL,
     poolAddressesProvider: AaveV3Arbitrum.POOL_ADDRESSES_PROVIDER,
     protocolDataProvider: AaveV3Arbitrum.AAVE_PROTOCOL_DATA_PROVIDER,
+    oracleAddress: AaveV3Arbitrum.ORACLE,
     uiPoolDataProvider: AaveV3Arbitrum.UI_POOL_DATA_PROVIDER,
     assets: {
       USDC: AaveV3Arbitrum.ASSETS.USDC.UNDERLYING,
@@ -38,6 +39,7 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
     poolAddress: AaveV3Base.POOL,
     poolAddressesProvider: AaveV3Base.POOL_ADDRESSES_PROVIDER,
     protocolDataProvider: AaveV3Base.AAVE_PROTOCOL_DATA_PROVIDER,
+    oracleAddress: AaveV3Base.ORACLE,
     uiPoolDataProvider: AaveV3Base.UI_POOL_DATA_PROVIDER,
     assets: {
       USDC: AaveV3Base.ASSETS.USDC.UNDERLYING,
@@ -53,6 +55,7 @@ export const CHAIN_CONFIGS: ChainConfig[] = [
     poolAddress: AaveV3Optimism.POOL,
     poolAddressesProvider: AaveV3Optimism.POOL_ADDRESSES_PROVIDER,
     protocolDataProvider: AaveV3Optimism.AAVE_PROTOCOL_DATA_PROVIDER,
+    oracleAddress: AaveV3Optimism.ORACLE,
     uiPoolDataProvider: AaveV3Optimism.UI_POOL_DATA_PROVIDER,
     assets: {
       USDC: AaveV3Optimism.ASSETS.USDC.UNDERLYING,

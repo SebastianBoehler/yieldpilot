@@ -1,6 +1,7 @@
 import { scheduleLabel } from "@/lib/utils/time";
 import type { DashboardPosition, DashboardSnapshot } from "@/types/domain";
 import { env } from "@/lib/config/env";
+import { getLifiTokenRefKey, LIFI_SOLANA_CHAIN_ID, resolveLifiTokenSymbols } from "@/lib/lifi/tokens";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -175,6 +176,15 @@ export async function getLiveSolanaDashboardSnapshot(walletAddress: string): Pro
   });
 
   const priceMap = await getTokenPrices(Array.from(balances.keys()));
+  const lifiTokenSymbols = await resolveLifiTokenSymbols(
+    Array.from(balances.keys())
+      .filter((mint) => mint !== SOL_MINT)
+      .map((mint) => ({
+        chain: LIFI_SOLANA_CHAIN_ID,
+        address: mint,
+        fallbackSymbol: KNOWN_TOKEN_SYMBOLS[mint] ?? shortenMint(mint),
+      })),
+  );
 
   const positions: DashboardPosition[] = Array.from(balances.entries())
     .map(([mint, balanceFormatted]) => {
@@ -187,7 +197,10 @@ export async function getLiveSolanaDashboardSnapshot(walletAddress: string): Pro
         chainKey: "solana",
         chainLabel: "Solana",
         protocolLabel: "Wallet",
-        assetSymbol: KNOWN_TOKEN_SYMBOLS[mint] ?? shortenMint(mint),
+        assetSymbol:
+          mint === SOL_MINT
+            ? "SOL"
+            : lifiTokenSymbols.get(getLifiTokenRefKey(LIFI_SOLANA_CHAIN_ID, mint)) ?? KNOWN_TOKEN_SYMBOLS[mint] ?? shortenMint(mint),
         assetAddress: mint,
         balanceFormatted,
         balanceUsd,

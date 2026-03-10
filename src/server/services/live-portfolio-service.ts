@@ -2,6 +2,7 @@ import { getAaveStableOpportunities, getAaveStablePositions } from "@/lib/protoc
 import { scheduleLabel } from "@/lib/utils/time";
 import type { ConnectedWalletType, DashboardSnapshot } from "@/types/domain";
 import { env } from "@/lib/config/env";
+import { getLifiTokenRefKey, resolveLifiTokenSymbols } from "@/lib/lifi/tokens";
 import { getDashboardSnapshot } from "@/server/services/strategy-service";
 import { getLiveSolanaDashboardSnapshot } from "@/server/services/solana-portfolio-service";
 
@@ -38,15 +39,40 @@ export async function getLiveDashboardSnapshot(params: {
     getAaveStableOpportunities(),
     getDashboardSnapshot(walletAddress).catch(() => undefined),
   ]);
+  const tokenSymbols = await resolveLifiTokenSymbols([
+    ...positions.map((position) => ({
+      chain: position.chainId,
+      address: position.assetAddress,
+      fallbackSymbol: position.assetSymbol,
+    })),
+    ...opportunities.slice(0, 1).map((opportunity) => ({
+      chain: opportunity.chainId,
+      address: opportunity.assetAddress,
+      fallbackSymbol: opportunity.assetSymbol,
+    })),
+  ]);
+  const resolvedPositions = positions.map((position) => ({
+    ...position,
+    assetSymbol:
+      tokenSymbols.get(getLifiTokenRefKey(position.chainId, position.assetAddress)) ?? position.assetSymbol,
+  }));
+  const bestOpportunity = opportunities[0]
+    ? {
+        ...opportunities[0],
+        assetSymbol:
+          tokenSymbols.get(getLifiTokenRefKey(opportunities[0].chainId, opportunities[0].assetAddress))
+          ?? opportunities[0].assetSymbol,
+      }
+    : undefined;
 
-  const totalPortfolioUsd = positions.reduce((sum, position) => sum + position.balanceUsd, 0);
+  const totalPortfolioUsd = resolvedPositions.reduce((sum, position) => sum + position.balanceUsd, 0);
   const effectiveApy =
     totalPortfolioUsd === 0
       ? 0
-      : positions.reduce((sum, position) => sum + position.balanceUsd * position.apy, 0) / totalPortfolioUsd;
+      : resolvedPositions.reduce((sum, position) => sum + position.balanceUsd * position.apy, 0) / totalPortfolioUsd;
 
   const chainAgg = new Map<string, number>();
-  positions.forEach((position) => {
+  resolvedPositions.forEach((position) => {
     chainAgg.set(position.chainLabel, (chainAgg.get(position.chainLabel) ?? 0) + position.balanceUsd);
   });
 
@@ -57,7 +83,7 @@ export async function getLiveDashboardSnapshot(params: {
     effectiveApy,
     pendingApprovals: persisted?.pendingApprovals ?? 0,
     autonomousModeEnabled: persisted?.autonomousModeEnabled ?? false,
-    positions: positions.map((position) => ({
+    positions: resolvedPositions.map((position) => ({
       id: position.id,
       walletAddress: position.walletAddress,
       chainKey: position.chainKey,
@@ -72,7 +98,7 @@ export async function getLiveDashboardSnapshot(params: {
       metadata: position.metadata,
     })),
     opportunityCount: opportunities.length,
-    currentAllocation: positions.map((position) => ({
+    currentAllocation: resolvedPositions.map((position) => ({
       label: `${position.assetSymbol} · ${position.protocolLabel}`,
       value: position.balanceUsd,
     })),
@@ -82,6 +108,6 @@ export async function getLiveDashboardSnapshot(params: {
     loopStatus: persisted?.loopStatus ?? {
       scheduleLabel: scheduleLabel(env.AGENT_LOOP_INTERVAL_MINUTES),
     },
-    bestOpportunity: opportunities[0],
+    bestOpportunity,
   };
 }

@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum StrategyMode {
+  HUMAN_APPROVAL
+  AUTONOMOUS
+}
+
+enum RiskProfile {
+  CONSERVATIVE
+  BALANCED
+  AGGRESSIVE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  EXECUTED
+  FAILED
+}
+
+enum RunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum DecisionStatus {
+  NO_ACTION
+  QUEUED_FOR_APPROVAL
+  EXECUTING
+  EXECUTED
+  REJECTED
+  BLOCKED
+  FAILED
+}
+
+enum TransactionStatus {
+  PENDING
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  SKIPPED
+}
+
+model User {
+  id               String             @id @default(cuid())
+  walletAddress    String             @unique
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  strategies       Strategy[]
+  approvalRequests ApprovalRequest[]
+  executionLogs    ExecutionLog[]
+  agentRuns        AgentRun[]
+}
+
+model Strategy {
+  id                   String               @id @default(cuid())
+  userId               String
+  name                 String
+  mode                 StrategyMode         @default(HUMAN_APPROVAL)
+  riskProfile          RiskProfile          @default(BALANCED)
+  rebalanceThresholdBps Int                 @default(50)
+  maxRebalanceUsd      Float                @default(10000)
+  maxDailyMovedUsd     Float                @default(25000)
+  cooldownMinutes      Int                  @default(120)
+  slippageBps          Int                  @default(30)
+  dryRun               Boolean              @default(false)
+  emergencyPause       Boolean              @default(false)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyConfig         PolicyConfig?
+  positions            Position[]
+  opportunitySnapshots OpportunitySnapshot[]
+  rebalanceDecisions   RebalanceDecision[]
+  approvalRequests     ApprovalRequest[]
+  agentRuns            AgentRun[]
+}
+
+model PolicyConfig {
+  id                             String      @id @default(cuid())
+  strategyId                     String      @unique
+  approvedChains                 Json
+  approvedProtocols              Json
+  approvedAssets                 Json
+  protocolPermanentApprovals     Json
+  protocolAmountThresholds       Json
+  maxTransactionUsd              Float       @default(10000)
+  minNetBenefitUsd               Float       @default(5)
+  maxSlippageBps                 Int         @default(30)
+  dailyMovedLimitUsd             Float?      @default(25000)
+  stopLossBps                    Int?
+  autoApproveTrustedProtocols    Boolean     @default(false)
+  allowUnlimitedApprovals        Boolean     @default(false)
+  createdAt                      DateTime    @default(now())
+  updatedAt                      DateTime    @updatedAt
+  strategy                       Strategy    @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+}
+
+model Position {
+  id                String      @id @default(cuid())
+  strategyId        String
+  chainId           Int
+  chainKey          String
+  protocol          String
+  assetSymbol       String
+  assetAddress      String
+  balance           String
+  balanceUsd        Float
+  apy               Float
+  positionType      String
+  sourceAddress     String
+  metadata          Json
+  updatedAt         DateTime    @updatedAt
+  strategy          Strategy    @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@unique([strategyId, chainId, protocol, assetAddress, positionType], map: "position_scope")
+}
+
+model OpportunitySnapshot {
+  id                String      @id @default(cuid())
+  strategyId        String
+  chainId           Int
+  chainKey          String
+  protocol          String
+  poolId            String
+  assetSymbol       String
+  assetAddress      String
+  apy               Float
+  score             Float
+  tvlUsd            Float
+  riskPenalty       Float
+  metadata          Json
+  capturedAt        DateTime    @default(now())
+  strategy          Strategy    @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+}
+
+model RebalanceDecision {
+  id                   String          @id @default(cuid())
+  strategyId           String
+  agentRunId           String?
+  status               DecisionStatus  @default(NO_ACTION)
+  summary              String
+  reason               String
+  sourceChainId        Int?
+  destinationChainId   Int?
+  sourceProtocol       String?
+  destinationProtocol  String?
+  sourceAsset          String?
+  destinationAsset     String?
+  amount               String?
+  amountUsd            Float?
+  estimatedApyDelta    Float?
+  estimatedNetBenefitUsd Float?
+  bridgeCostUsd        Float?
+  gasCostUsd           Float?
+  slippageBps          Int?
+  scoreBreakdown       Json
+  actionPlan           Json
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  strategy             Strategy        @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentRun             AgentRun?       @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  approvalRequests     ApprovalRequest[]
+  transactionRecords   TransactionRecord[]
+}
+
+model ApprovalRequest {
+  id                 String          @id @default(cuid())
+  userId             String
+  strategyId         String
+  rebalanceDecisionId String
+  status             ApprovalStatus  @default(PENDING)
+  approvalKind       String
+  requestedAction    Json
+  transactionPlan    Json
+  expiresAt          DateTime?
+  approvedAt         DateTime?
+  rejectedAt         DateTime?
+  executedAt         DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy           Strategy        @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  rebalanceDecision  RebalanceDecision @relation(fields: [rebalanceDecisionId], references: [id], onDelete: Cascade)
+  transactionRecords TransactionRecord[]
+}
+
+model ExecutionLog {
+  id                 String      @id @default(cuid())
+  userId             String
+  strategyId         String?
+  agentRunId         String?
+  level              String
+  message            String
+  context            Json
+  createdAt          DateTime    @default(now())
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TransactionRecord {
+  id                 String             @id @default(cuid())
+  rebalanceDecisionId String?
+  approvalRequestId  String?
+  stepKey            String
+  transactionType    String
+  chainId            Int
+  toAddress          String
+  data               String?
+  value              String?
+  spenderAddress     String?
+  hash               String?
+  status             TransactionStatus  @default(PENDING)
+  metadata           Json
+  submittedAt        DateTime?
+  confirmedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  rebalanceDecision  RebalanceDecision? @relation(fields: [rebalanceDecisionId], references: [id], onDelete: SetNull)
+  approvalRequest    ApprovalRequest?   @relation(fields: [approvalRequestId], references: [id], onDelete: SetNull)
+}
+
+model AgentRun {
+  id                  String        @id @default(cuid())
+  userId              String
+  strategyId          String
+  status              RunStatus     @default(RUNNING)
+  startedAt           DateTime      @default(now())
+  completedAt         DateTime?
+  summary             String?
+  agentMode           String
+  inputs              Json
+  outputs             Json?
+  error               String?
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy            Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  decisions           RebalanceDecision[]
+}

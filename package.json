@@ -2,25 +2,73 @@
   "name": "yieldpilot",
   "version": "0.1.0",
   "private": true,
+  "description": "Autonomous cross-chain stablecoin treasury management powered by Google ADK, LI.FI, and live Aave RPC data.",
+  "homepage": "https://github.com/SebastianBoehler/yieldpilot#readme",
+  "bugs": {
+    "url": "https://github.com/SebastianBoehler/yieldpilot/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebastianBoehler/yieldpilot.git"
+  },
+  "keywords": [
+    "defi",
+    "cross-chain",
+    "yield-optimization",
+    "autonomous-agents",
+    "google-adk",
+    "lifi",
+    "aave",
+    "stablecoins",
+    "nextjs",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint . --ignore-pattern coverage --ignore-pattern .next",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "db:generate": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} prisma generate",
+    "db:push": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} node scripts/db-push.mjs",
+    "worker": "tsx scripts/agent-worker.ts"
   },
   "dependencies": {
+    "@aave-dao/aave-address-book": "^4.47.4",
+    "@aave/core-v3": "^1.19.3",
+    "@aave/periphery-v3": "^2.5.2",
+    "@google/adk": "^0.5.0",
+    "@lifi/sdk": "^3.16.0",
+    "@prisma/client": "^6.19.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.577.0",
     "next": "16.1.6",
+    "node-cron": "^4.2.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "recharts": "^3.8.0",
+    "tailwind-merge": "^3.5.0",
+    "viem": "^2.47.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "prisma": "^6.19.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

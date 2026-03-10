@@ -17,6 +17,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_ARBITRUM_RPC_URL: z.string().url().default("https://arb1.arbitrum.io/rpc"),
   NEXT_PUBLIC_BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
   NEXT_PUBLIC_OPTIMISM_RPC_URL: z.string().url().default("https://mainnet.optimism.io"),
+  SOLANA_RPC_URL: z.string().url().default("https://api.mainnet-beta.solana.com"),
+  NEXT_PUBLIC_SOLANA_RPC_URL: z.string().url().default("https://api.mainnet-beta.solana.com"),
 });
 
 export const env = envSchema.parse({
@@ -34,6 +36,8 @@ export const env = envSchema.parse({
   NEXT_PUBLIC_ARBITRUM_RPC_URL: process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL,
   NEXT_PUBLIC_BASE_RPC_URL: process.env.NEXT_PUBLIC_BASE_RPC_URL,
   NEXT_PUBLIC_OPTIMISM_RPC_URL: process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL,
+  SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
+  NEXT_PUBLIC_SOLANA_RPC_URL: process.env.NEXT_PUBLIC_SOLANA_RPC_URL,
 });
 
 export const hasGoogleAdkCredentials = Boolean(env.GOOGLE_API_KEY);

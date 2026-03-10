@@ -133,115 +133,130 @@ async function getChainReserveUniverse(chain: ChainConfig): Promise<YieldOpportu
 }
 
 export async function getAaveStableOpportunities(): Promise<YieldOpportunity[]> {
-  const results = await Promise.all(CHAIN_CONFIGS.map((chain) => getChainReserveUniverse(chain)));
+  const results = await Promise.all(
+    CHAIN_CONFIGS.map(async (chain) => {
+      try {
+        return await getChainReserveUniverse(chain);
+      } catch (error) {
+        console.error(`Failed to load Aave reserve universe for ${chain.label}.`, error);
+        return [];
+      }
+    }),
+  );
+
   return results.flat().sort((left, right) => right.apy - left.apy);
 }
 
 export async function getAaveStablePositions(walletAddress: `0x${string}`): Promise<PortfolioPosition[]> {
   const positions = await Promise.all(
     CHAIN_CONFIGS.map(async (chain) => {
-      const publicClient = getClient(chain);
-      const [reservesData, baseCurrencyInfo] = await publicClient.readContract({
-        address: chain.uiPoolDataProvider,
-        abi: uiPoolDataProviderArtifact.abi,
-        functionName: "getReservesData",
-        args: [chain.poolAddressesProvider],
-      }) as [ReserveData[], BaseCurrencyInfo];
+      try {
+        const publicClient = getClient(chain);
+        const [reservesData, baseCurrencyInfo] = await publicClient.readContract({
+          address: chain.uiPoolDataProvider,
+          abi: uiPoolDataProviderArtifact.abi,
+          functionName: "getReservesData",
+          args: [chain.poolAddressesProvider],
+        }) as [ReserveData[], BaseCurrencyInfo];
 
-      const [userReserves] = await publicClient.readContract({
-        address: chain.uiPoolDataProvider,
-        abi: uiPoolDataProviderArtifact.abi,
-        functionName: "getUserReservesData",
-        args: [chain.poolAddressesProvider, walletAddress],
-      }) as [UserReserveData[], number];
+        const [userReserves] = await publicClient.readContract({
+          address: chain.uiPoolDataProvider,
+          abi: uiPoolDataProviderArtifact.abi,
+          functionName: "getUserReservesData",
+          args: [chain.poolAddressesProvider, walletAddress],
+        }) as [UserReserveData[], number];
 
-      const reserveByAsset = new Map(
-        reservesData.map((reserve) => [reserve.underlyingAsset.toLowerCase(), reserve]),
-      );
+        const reserveByAsset = new Map(
+          reservesData.map((reserve) => [reserve.underlyingAsset.toLowerCase(), reserve]),
+        );
 
-      const lendingPositions = userReserves
-        .map((userReserve) => {
-          const reserve = reserveByAsset.get(userReserve.underlyingAsset.toLowerCase());
-          if (!reserve || !isStableReserve(reserve.symbol)) {
-            return undefined;
-          }
+        const lendingPositions = userReserves
+          .map((userReserve) => {
+            const reserve = reserveByAsset.get(userReserve.underlyingAsset.toLowerCase());
+            if (!reserve || !isStableReserve(reserve.symbol)) {
+              return undefined;
+            }
 
-          const currentBalance = (userReserve.scaledATokenBalance * reserve.liquidityIndex) / RAY;
-          if (currentBalance <= 0n) {
-            return undefined;
-          }
+            const currentBalance = (userReserve.scaledATokenBalance * reserve.liquidityIndex) / RAY;
+            if (currentBalance <= 0n) {
+              return undefined;
+            }
 
-          const priceUsd = calculatePriceUsd(reserve.priceInMarketReferenceCurrency, baseCurrencyInfo);
-          const apy = calculateApy(reserve.liquidityRate);
+            const priceUsd = calculatePriceUsd(reserve.priceInMarketReferenceCurrency, baseCurrencyInfo);
+            const apy = calculateApy(reserve.liquidityRate);
 
-          return {
-            id: `${chain.id}:${reserve.underlyingAsset}:aave`,
-            walletAddress,
-            chainId: chain.id,
-            chainKey: chain.key,
-            chainLabel: chain.label,
-            protocol: AAVE_PROTOCOL_KEY,
-            protocolLabel: AAVE_PROTOCOL_LABEL,
-            assetSymbol: reserve.symbol,
-            assetAddress: reserve.underlyingAsset,
-            balance: currentBalance.toString(),
-            balanceFormatted: formatUnitsToNumber(currentBalance, Number(reserve.decimals)),
-            balanceUsd: formatUnitsToNumber(currentBalance, Number(reserve.decimals)) * priceUsd,
-            apy,
-            positionType: "lending",
-            metadata: {
-              liquidityIndex: reserve.liquidityIndex.toString(),
-              priceUsd,
-              aTokenAddress: reserve.aTokenAddress,
-            },
-          } satisfies PortfolioPosition;
-        })
-        .filter(Boolean) as PortfolioPosition[];
+            return {
+              id: `${chain.id}:${reserve.underlyingAsset}:aave`,
+              walletAddress,
+              chainId: chain.id,
+              chainKey: chain.key,
+              chainLabel: chain.label,
+              protocol: AAVE_PROTOCOL_KEY,
+              protocolLabel: AAVE_PROTOCOL_LABEL,
+              assetSymbol: reserve.symbol,
+              assetAddress: reserve.underlyingAsset,
+              balance: currentBalance.toString(),
+              balanceFormatted: formatUnitsToNumber(currentBalance, Number(reserve.decimals)),
+              balanceUsd: formatUnitsToNumber(currentBalance, Number(reserve.decimals)) * priceUsd,
+              apy,
+              positionType: "lending",
+              metadata: {
+                liquidityIndex: reserve.liquidityIndex.toString(),
+                priceUsd,
+                aTokenAddress: reserve.aTokenAddress,
+              },
+            } satisfies PortfolioPosition;
+          })
+          .filter(Boolean) as PortfolioPosition[];
 
-      const stableReserves = reservesData.filter((reserve) => isStableReserve(reserve.symbol));
-      const idleBalances = await publicClient.multicall({
-        allowFailure: true,
-        contracts: stableReserves.map((reserve) => ({
-          address: reserve.underlyingAsset,
-          abi: erc20Abi,
-          functionName: "balanceOf",
-          args: [walletAddress],
-        })),
-      });
+        const stableReserves = reservesData.filter((reserve) => isStableReserve(reserve.symbol));
+        const idleBalances = await publicClient.multicall({
+          allowFailure: true,
+          contracts: stableReserves.map((reserve) => ({
+            address: reserve.underlyingAsset,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [walletAddress],
+          })),
+        });
 
-      const idlePositions = stableReserves
-        .map((reserve, index) => {
-          const result = idleBalances[index];
-          const balance = result.status === "success" ? BigInt(result.result as bigint) : 0n;
-          if (result.status !== "success" || balance <= 0n) {
-            return undefined;
-          }
+        const idlePositions = stableReserves
+          .map((reserve, index) => {
+            const result = idleBalances[index];
+            const balance = result.status === "success" ? BigInt(result.result as bigint) : 0n;
+            if (result.status !== "success" || balance <= 0n) {
+              return undefined;
+            }
 
-          const priceUsd = calculatePriceUsd(reserve.priceInMarketReferenceCurrency, baseCurrencyInfo);
+            const priceUsd = calculatePriceUsd(reserve.priceInMarketReferenceCurrency, baseCurrencyInfo);
 
-          return {
-            id: `${chain.id}:${reserve.underlyingAsset}:wallet`,
-            walletAddress,
-            chainId: chain.id,
-            chainKey: chain.key,
-            chainLabel: chain.label,
-            protocol: "wallet",
-            protocolLabel: "Wallet",
-            assetSymbol: reserve.symbol,
-            assetAddress: reserve.underlyingAsset,
-            balance: balance.toString(),
-            balanceFormatted: formatUnitsToNumber(balance, Number(reserve.decimals)),
-            balanceUsd: formatUnitsToNumber(balance, Number(reserve.decimals)) * priceUsd,
-            apy: 0,
-            positionType: "idle",
-            metadata: {
-              priceUsd,
-            },
-          } satisfies PortfolioPosition;
-        })
-        .filter(Boolean) as PortfolioPosition[];
+            return {
+              id: `${chain.id}:${reserve.underlyingAsset}:wallet`,
+              walletAddress,
+              chainId: chain.id,
+              chainKey: chain.key,
+              chainLabel: chain.label,
+              protocol: "wallet",
+              protocolLabel: "Wallet",
+              assetSymbol: reserve.symbol,
+              assetAddress: reserve.underlyingAsset,
+              balance: balance.toString(),
+              balanceFormatted: formatUnitsToNumber(balance, Number(reserve.decimals)),
+              balanceUsd: formatUnitsToNumber(balance, Number(reserve.decimals)) * priceUsd,
+              apy: 0,
+              positionType: "idle",
+              metadata: {
+                priceUsd,
+              },
+            } satisfies PortfolioPosition;
+          })
+          .filter(Boolean) as PortfolioPosition[];
 
-      return [...lendingPositions, ...idlePositions];
+        return [...lendingPositions, ...idlePositions];
+      } catch (error) {
+        console.error(`Failed to load Aave positions for ${chain.label}.`, error);
+        return [];
+      }
     }),
   );
 

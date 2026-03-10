@@ -5,7 +5,7 @@ import type { DashboardSnapshot, ExecutionLogEntry, PortfolioPosition, StrategyP
 import { parseJsonArray, parseJsonNumberArray, parseJsonRecord } from "@/lib/utils/number";
 import { scheduleLabel } from "@/lib/utils/time";
 
-const defaultStrategyConfig = {
+export const defaultStrategyConfig = {
   name: "Primary Treasury",
   mode: StrategyMode.HUMAN_APPROVAL,
   riskProfile: RiskProfile.BALANCED,
@@ -18,7 +18,7 @@ const defaultStrategyConfig = {
   emergencyPause: false,
 };
 
-const defaultPolicyConfig = {
+export const defaultPolicyConfig = {
   approvedChains: [42161, 8453, 10],
   approvedProtocols: ["aave-v3"],
   approvedAssets: ["USDC", "USDT", "DAI"],
@@ -32,6 +32,33 @@ const defaultPolicyConfig = {
   autoApproveTrustedProtocols: false,
   allowUnlimitedApprovals: false,
 };
+
+export function buildDefaultStrategyPolicy(walletMode: StrategyMode = StrategyMode.HUMAN_APPROVAL): StrategyPolicy {
+  return {
+    strategyId: "ephemeral-strategy",
+    mode: walletMode,
+    riskProfile: defaultStrategyConfig.riskProfile,
+    rebalanceThresholdBps: defaultStrategyConfig.rebalanceThresholdBps,
+    maxRebalanceUsd: defaultStrategyConfig.maxRebalanceUsd,
+    maxDailyMovedUsd: defaultStrategyConfig.maxDailyMovedUsd,
+    cooldownMinutes: defaultStrategyConfig.cooldownMinutes,
+    slippageBps: defaultStrategyConfig.slippageBps,
+    dryRun: defaultStrategyConfig.dryRun,
+    emergencyPause: defaultStrategyConfig.emergencyPause,
+    approvedChains: [...defaultPolicyConfig.approvedChains],
+    approvedProtocols: [...defaultPolicyConfig.approvedProtocols],
+    approvedAssets: [...defaultPolicyConfig.approvedAssets],
+    protocolPermanentApprovals: [...defaultPolicyConfig.protocolPermanentApprovals],
+    protocolAmountThresholds: { ...defaultPolicyConfig.protocolAmountThresholds },
+    maxTransactionUsd: defaultPolicyConfig.maxTransactionUsd,
+    minNetBenefitUsd: defaultPolicyConfig.minNetBenefitUsd,
+    maxSlippageBps: defaultPolicyConfig.maxSlippageBps,
+    dailyMovedLimitUsd: defaultPolicyConfig.dailyMovedLimitUsd,
+    stopLossBps: defaultPolicyConfig.stopLossBps,
+    autoApproveTrustedProtocols: defaultPolicyConfig.autoApproveTrustedProtocols,
+    allowUnlimitedApprovals: defaultPolicyConfig.allowUnlimitedApprovals,
+  };
+}
 
 export async function ensureUserStrategy(walletAddress?: string) {
   const normalizedWallet = (walletAddress ?? env.NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS)?.toLowerCase();
@@ -230,6 +257,8 @@ export async function getDashboardSnapshot(walletAddress?: string): Promise<Dash
       effectiveApy: 0,
       pendingApprovals: 0,
       autonomousModeEnabled: false,
+      positions: [],
+      opportunityCount: 0,
       currentAllocation: [],
       byChain: [],
       loopStatus: {
@@ -286,6 +315,24 @@ export async function getDashboardSnapshot(walletAddress?: string): Promise<Dash
     effectiveApy,
     pendingApprovals: approvals,
     autonomousModeEnabled: base.strategy.mode === "AUTONOMOUS",
+    positions: positions.map((position) => ({
+      id: position.id,
+      walletAddress: position.sourceAddress as `0x${string}`,
+      chainId: position.chainId,
+      chainKey: position.chainKey as "arbitrum" | "base" | "optimism",
+      chainLabel: position.chainKey,
+      protocol: position.protocol as "wallet" | "aave-v3",
+      protocolLabel: position.protocol === "wallet" ? "Wallet" : "Aave V3",
+      assetSymbol: position.assetSymbol,
+      assetAddress: position.assetAddress as `0x${string}`,
+      balance: position.balance,
+      balanceFormatted: 0,
+      balanceUsd: position.balanceUsd,
+      apy: position.apy,
+      positionType: position.positionType as "idle" | "lending",
+      metadata: (position.metadata ?? {}) as Record<string, unknown>,
+    })),
+    opportunityCount: bestOpportunitySnapshot ? 1 : 0,
     currentAllocation,
     byChain: Array.from(chainAgg.entries()).map(([label, value]) => ({ label, value })),
     lastDecision: lastDecision

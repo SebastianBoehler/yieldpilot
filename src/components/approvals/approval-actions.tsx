@@ -2,75 +2,23 @@
 
 import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAccount, useConfig, useSwitchChain } from "wagmi";
 import { Button } from "@/components/ui/button";
-
-type EthereumProvider = {
-  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
-};
-
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider;
-  }
-}
-
-type TxStep = {
-  stepKey: string;
-  title: string;
-  transactionType: string;
-  chainId: number;
-  to: string;
-  data?: string;
-  value?: string;
-};
+import { executeTransactionPlan } from "@/lib/wallet/execute-transaction-plan";
 
 type ExecutionPlan = {
   routeTool: string;
   sourceChainId: number;
   destinationChainId: number;
-  txSteps: TxStep[];
+  txSteps: Array<{
+    stepKey: string;
+    chainId: number;
+    to: `0x${string}`;
+    data?: `0x${string}`;
+    value?: string;
+    transactionType: string;
+  }>;
 };
-
-function toHex(value: number | bigint) {
-  return `0x${BigInt(value).toString(16)}`;
-}
-
-async function switchChain(chainId: number) {
-  await window.ethereum?.request({
-    method: "wallet_switchEthereumChain",
-    params: [{ chainId: toHex(chainId) }],
-  });
-}
-
-async function sendTransaction(step: TxStep) {
-  const txHash = await window.ethereum?.request({
-    method: "eth_sendTransaction",
-    params: [
-      {
-        to: step.to,
-        data: step.data,
-        value: step.value ? toHex(BigInt(step.value)) : undefined,
-      },
-    ],
-  });
-
-  return txHash as string;
-}
-
-async function waitForReceipt(hash: string) {
-  while (true) {
-    const receipt = await window.ethereum?.request({
-      method: "eth_getTransactionReceipt",
-      params: [hash],
-    });
-
-    if (receipt) {
-      return receipt as { status: string };
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-  }
-}
 
 export function ApprovalActions({
   approvalId,
@@ -79,6 +27,9 @@ export function ApprovalActions({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState<null | string>(null);
+  const { address } = useAccount();
+  const config = useConfig();
+  const { switchChainAsync } = useSwitchChain();
 
   async function mutate(action: string, payload?: Record<string, unknown>) {
     const response = await fetch(`/api/approvals/${approvalId}/decision`, {
@@ -96,7 +47,7 @@ export function ApprovalActions({
   }
 
   async function approveOnce() {
-    if (!window.ethereum) {
+    if (!address || !switchChainAsync) {
       return;
     }
 
@@ -104,25 +55,17 @@ export function ApprovalActions({
     try {
       const response = await mutate("approve_once");
       const plan = response.plan as ExecutionPlan;
-      const results: Array<{ stepKey: string; chainId: number; status: string; hash?: string }> = [];
-
-      for (const step of plan.txSteps) {
-        await switchChain(step.chainId);
-        const hash = await sendTransaction(step);
-        const receipt = await waitForReceipt(hash);
-        results.push({
-          stepKey: step.stepKey,
-          chainId: step.chainId,
-          status: receipt.status === "0x1" ? "CONFIRMED" : "FAILED",
-          hash,
-        });
-
-        if (step.transactionType === "bridge") {
+      const results = await executeTransactionPlan({
+        account: address,
+        config,
+        executionPlan: plan,
+        switchChain: (chainId) => switchChainAsync({ chainId }),
+        onBridgeStatus: async (txHash) => {
           await mutate("bridge_status", {
-            txHash: hash,
+            txHash,
           });
-        }
-      }
+        },
+      });
 
       await mutate("record_execution", {
         results,
@@ -181,7 +124,7 @@ export function ApprovalActions({
 
   return (
     <div className="flex flex-wrap gap-3">
-      <Button onClick={approveOnce} disabled={pending !== null}>
+      <Button onClick={approveOnce} disabled={pending !== null || !address}>
         {pending === "approve_once" ? "Executing..." : "Approve once"}
       </Button>
       <Button variant="secondary" onClick={trustProtocol} disabled={pending !== null}>

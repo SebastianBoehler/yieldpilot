@@ -23,6 +23,24 @@ The system uses Google Agent Development Kit as the agent framework, LI.FI as th
 - Human approval and autonomous execution modes sharing the same transaction planner
 - Live Aave V3 RPC reads for opportunities and positions
 - Full audit trail for approvals, decisions, transactions, and agent runs
+- Vercel-friendly preview flow for live portfolio and route inspection
+
+## Current deployment posture
+
+YieldPilot is now shaped for a Vercel preview deployment where you can:
+
+- connect an EVM wallet such as Phantom EVM, MetaMask-compatible injected wallets, or WalletConnect
+- inspect live stablecoin balances and Aave positions across supported chains
+- inspect discovered yield sources from live RPC reads
+- generate a live rebalance plan
+- execute the full wallet-side sequence, including the destination deposit step
+
+What is intentionally not enabled yet:
+
+- scheduled automation via cron
+- production-grade persistent infrastructure defaults
+
+The preview deployment path is centered on live read plus direct browser-wallet execution. The persisted approval and log model still exists, but for durable multi-user persistence you should move the deployment to a managed Postgres database.
 
 ## Core stack
 
@@ -86,6 +104,7 @@ Every cycle:
 - Builds the exact transaction sequence
 - Queues approvals before any allowance change, swap, bridge, withdrawal, or deposit
 - Exposes per-step transaction data in the approval queue
+- Also supports direct browser-wallet execution of a live plan from the opportunities page
 
 #### Autonomous
 
@@ -155,6 +174,10 @@ Important variables:
 - `ARBITRUM_RPC_URL`
 - `BASE_RPC_URL`
 - `OPTIMISM_RPC_URL`
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: optional, enables WalletConnect in the browser
+- `NEXT_PUBLIC_ARBITRUM_RPC_URL`
+- `NEXT_PUBLIC_BASE_RPC_URL`
+- `NEXT_PUBLIC_OPTIMISM_RPC_URL`
 - `LIFI_INTEGRATOR`
 - `NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS`: wallet to inspect and operate against in local MVP mode
 - `GOOGLE_API_KEY`: enables live Google ADK reviews
@@ -185,6 +208,21 @@ Start the recurring agent worker in a second terminal:
 ```bash
 npm run worker
 ```
+
+## Vercel preview
+
+Recommended env vars for a preview deployment:
+
+- `DATABASE_URL=file:/tmp/yieldpilot.db`
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` if you want WalletConnect support
+- `GOOGLE_API_KEY` if you want ADK review summaries to use Gemini instead of the deterministic fallback
+
+The preview flow is meant for:
+
+- viewing live opportunities and sources
+- viewing supported cross-chain wallet balances
+- generating a live plan
+- executing that plan from a connected EVM wallet
 
 ## Quality checks
 
@@ -222,7 +260,10 @@ The compose setup persists the SQLite database in a named Docker volume and star
 - `src/lib/risk/policy-engine.ts`: policy validation
 - `src/lib/scoring/engine.ts`: opportunity scoring and ranking
 - `src/lib/wallet/signing-service.ts`: approval prep and autonomous signing
+- `src/lib/wallet/wagmi-config.ts`: browser wallet connector configuration
+- `src/lib/wallet/execute-transaction-plan.ts`: sequential wallet-side transaction execution
 - `src/server/services/agent-service.ts`: end-to-end agent run service
+- `src/server/services/live-portfolio-service.ts`: DB-independent live portfolio snapshot
 
 ## Policy controls
 
@@ -242,6 +283,7 @@ Approvals are never hidden. In human mode, allowance transactions are surfaced e
 ## Current MVP limits
 
 - Opportunity coverage is intentionally narrow and stablecoin-focused
+- Browser wallet support is EVM-only today; Phantom Solana is not integrated yet
 - Autonomous execution assumes an EVM-compatible browser wallet or a backend execution key
 - Base support is narrower than Arbitrum and Optimism because the live opportunity set is constrained to reliable Aave markets
 - The first protocol abstraction is Aave-centric; Morpho and Spark are the next natural extensions

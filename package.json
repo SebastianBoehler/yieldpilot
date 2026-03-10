@@ -27,6 +27,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "postinstall": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} prisma generate",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -44,6 +45,7 @@
     "@google/adk": "^0.5.0",
     "@lifi/sdk": "^3.16.0",
     "@prisma/client": "^6.19.2",
+    "@tanstack/react-query": "^5.90.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -55,6 +57,7 @@
     "recharts": "^3.8.0",
     "tailwind-merge": "^3.5.0",
     "viem": "^2.47.1",
+    "wagmi": "^3.5.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

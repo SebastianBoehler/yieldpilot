@@ -193,6 +193,8 @@ export type DashboardSnapshot = {
   effectiveApy: number;
   pendingApprovals: number;
   autonomousModeEnabled: boolean;
+  positions: PortfolioPosition[];
+  opportunityCount: number;
   currentAllocation: Array<{
     label: string;
     value: number;

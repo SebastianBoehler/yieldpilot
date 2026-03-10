@@ -1,21 +1,12 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useEffect, useState } from "react";
-import { RefreshCcw, Wallet } from "lucide-react";
+import { startTransition, useEffect, useMemo, useState } from "react";
+import { ChevronDown, RefreshCcw, Wallet } from "lucide-react";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { shortenAddress } from "@/lib/utils/format";
-
-type EthereumProvider = {
-  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
-};
-
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider;
-  }
-}
 
 export function WalletBar({
   walletAddress,
@@ -24,42 +15,46 @@ export function WalletBar({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [pending, setPending] = useState(false);
-  const [address, setAddress] = useState(walletAddress);
+  const [showConnectors, setShowConnectors] = useState(false);
+  const { address, isConnected, chain } = useAccount();
+  const connect = useConnect();
+  const disconnect = useDisconnect();
+
+  const activeAddress = address ?? walletAddress;
+  const availableConnectors = useMemo(
+    () => connect.connectors.filter((connector, index, array) => array.findIndex((item) => item.id === connector.id) === index),
+    [connect.connectors],
+  );
 
   useEffect(() => {
-    setAddress(walletAddress);
-  }, [walletAddress]);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    const currentWallet = searchParams.get("wallet");
 
-  async function connect() {
-    if (!window.ethereum) {
-      return;
-    }
-
-    setPending(true);
-    try {
-      const accounts = (await window.ethereum.request({
-        method: "eth_requestAccounts",
-      })) as string[];
-
-      const nextAddress = accounts[0];
-      if (!nextAddress) {
+    if (address) {
+      const normalized = address.toLowerCase();
+      if (currentWallet === normalized) {
         return;
       }
 
-      setAddress(nextAddress);
-      const nextParams = new URLSearchParams(searchParams.toString());
-      nextParams.set("wallet", nextAddress.toLowerCase());
+      nextParams.set("wallet", normalized);
       startTransition(() => {
         router.replace(`?${nextParams.toString()}`);
       });
-    } finally {
-      setPending(false);
+      return;
     }
-  }
+
+    if (!currentWallet) {
+      return;
+    }
+
+    nextParams.delete("wallet");
+    startTransition(() => {
+      router.replace(nextParams.size ? `?${nextParams.toString()}` : window.location.pathname);
+    });
+  }, [address, router, searchParams]);
 
   return (
-    <Panel className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <Panel className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Active treasury</p>
         <div className="mt-2 flex items-center gap-3">
@@ -67,19 +62,59 @@ export function WalletBar({
             <Wallet className="size-4" />
           </div>
           <div>
-            <p className="font-semibold text-slate-950">{shortenAddress(address)}</p>
-            <p className="text-sm text-slate-600">Browser wallet for human mode, backend signer for autonomous mode.</p>
+            <p className="font-semibold text-slate-950">{shortenAddress(activeAddress)}</p>
+            <p className="text-sm text-slate-600">
+              {chain?.name ? `${chain.name} connected` : "Connect an EVM wallet such as Phantom, MetaMask, or WalletConnect."}
+            </p>
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="secondary" onClick={() => router.refresh()}>
           <RefreshCcw className="mr-2 size-4" />
           Refresh
         </Button>
-        <Button onClick={connect} disabled={pending}>
-          {address ? "Switch wallet" : "Connect wallet"}
-        </Button>
+        {isConnected ? (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              disconnect.disconnect();
+              setShowConnectors(false);
+            }}
+          >
+            Disconnect
+          </Button>
+        ) : null}
+        <div className="relative">
+          <Button onClick={() => setShowConnectors((current) => !current)}>
+            {isConnected ? "Switch wallet" : "Connect wallet"}
+            <ChevronDown className="ml-2 size-4" />
+          </Button>
+          {showConnectors ? (
+            <div className="absolute right-0 z-20 mt-3 min-w-64 rounded-[24px] border border-slate-200 bg-white p-3 shadow-[0_20px_40px_-16px_rgba(15,23,42,0.35)]">
+              <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Wallet providers</p>
+              <div className="grid gap-2">
+                {availableConnectors.map((connector) => (
+                  <button
+                    key={connector.uid}
+                    className="rounded-2xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={connect.isPending}
+                    onClick={async () => {
+                      await connect.connectAsync({ connector });
+                      setShowConnectors(false);
+                    }}
+                    type="button"
+                  >
+                    {connector.name}
+                  </button>
+                ))}
+                {!availableConnectors.length ? (
+                  <p className="px-2 py-4 text-sm text-slate-500">No EVM wallet connector is available in this browser.</p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </Panel>
   );

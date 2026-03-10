@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { WalletProviders } from "@/components/providers/wallet-providers";
 import "./globals.css";
 
 const displayFont = Space_Grotesk({
@@ -25,7 +26,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${displayFont.variable} ${monoFont.variable} antialiased`}>{children}</body>
+      <body className={`${displayFont.variable} ${monoFont.variable} antialiased`}>
+        <WalletProviders>{children}</WalletProviders>
+      </body>
     </html>
   );
 }

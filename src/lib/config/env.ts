@@ -1,7 +1,9 @@
 import { z } from "zod";
 
+const defaultDatabaseUrl = process.env.VERCEL ? "file:/tmp/yieldpilot.db" : "file:./dev.db";
+
 const envSchema = z.object({
-  DATABASE_URL: z.string().min(1).default("file:./dev.db"),
+  DATABASE_URL: z.string().min(1).default(defaultDatabaseUrl),
   GOOGLE_API_KEY: z.string().optional(),
   GOOGLE_GENAI_MODEL: z.string().default("gemini-2.5-flash"),
   LIFI_INTEGRATOR: z.string().default("YieldPilot"),
@@ -11,10 +13,14 @@ const envSchema = z.object({
   BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
   OPTIMISM_RPC_URL: z.string().url().default("https://mainnet.optimism.io"),
   AGENT_LOOP_INTERVAL_MINUTES: z.coerce.number().int().positive().default(15),
+  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: z.string().optional(),
+  NEXT_PUBLIC_ARBITRUM_RPC_URL: z.string().url().default("https://arb1.arbitrum.io/rpc"),
+  NEXT_PUBLIC_BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
+  NEXT_PUBLIC_OPTIMISM_RPC_URL: z.string().url().default("https://mainnet.optimism.io"),
 });
 
 export const env = envSchema.parse({
-  DATABASE_URL: process.env.DATABASE_URL ?? "file:./dev.db",
+  DATABASE_URL: process.env.DATABASE_URL ?? defaultDatabaseUrl,
   GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
   GOOGLE_GENAI_MODEL: process.env.GOOGLE_GENAI_MODEL,
   LIFI_INTEGRATOR: process.env.LIFI_INTEGRATOR,
@@ -24,6 +30,10 @@ export const env = envSchema.parse({
   BASE_RPC_URL: process.env.BASE_RPC_URL,
   OPTIMISM_RPC_URL: process.env.OPTIMISM_RPC_URL,
   AGENT_LOOP_INTERVAL_MINUTES: process.env.AGENT_LOOP_INTERVAL_MINUTES,
+  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+  NEXT_PUBLIC_ARBITRUM_RPC_URL: process.env.NEXT_PUBLIC_ARBITRUM_RPC_URL,
+  NEXT_PUBLIC_BASE_RPC_URL: process.env.NEXT_PUBLIC_BASE_RPC_URL,
+  NEXT_PUBLIC_OPTIMISM_RPC_URL: process.env.NEXT_PUBLIC_OPTIMISM_RPC_URL,
 });
 
 export const hasGoogleAdkCredentials = Boolean(env.GOOGLE_API_KEY);

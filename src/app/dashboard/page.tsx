@@ -1,6 +1,7 @@
 import { AllocationChart } from "@/components/charts/allocation-chart";
 import { AppShell } from "@/components/layout/app-shell";
 import { WalletBar } from "@/components/layout/wallet-bar";
+import { PositionsTable } from "@/components/dashboard/positions-table";
 import { RunAgentButton } from "@/components/dashboard/run-agent-button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -8,7 +9,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { Panel } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { formatPercent, formatUsd } from "@/lib/utils/format";
-import { getDashboardSnapshot } from "@/server/services/strategy-service";
+import { getLiveDashboardSnapshot } from "@/server/services/live-portfolio-service";
 
 export default async function DashboardPage({
   searchParams,
@@ -17,7 +18,7 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const wallet = typeof params.wallet === "string" ? params.wallet : undefined;
-  const snapshot = await getDashboardSnapshot(wallet);
+  const snapshot = await getLiveDashboardSnapshot(wallet);
 
   return (
     <AppShell currentPath="/dashboard" walletBar={<WalletBar walletAddress={snapshot.walletAddress} />}>
@@ -31,7 +32,7 @@ export default async function DashboardPage({
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Portfolio value" value={formatUsd(snapshot.totalPortfolioUsd)} />
             <MetricCard label="Effective APY" value={formatPercent(snapshot.effectiveApy)} />
-            <MetricCard label="Pending approvals" value={String(snapshot.pendingApprovals)} />
+            <MetricCard label="Live markets" value={String(snapshot.opportunityCount)} />
             <MetricCard
               label="Autonomous mode"
               value={snapshot.autonomousModeEnabled ? "On" : "Off"}
@@ -39,7 +40,10 @@ export default async function DashboardPage({
             />
           </div>
           {snapshot.currentAllocation.length ? (
-            <AllocationChart data={snapshot.currentAllocation} />
+            <div className="space-y-5">
+              <AllocationChart data={snapshot.currentAllocation} />
+              <PositionsTable positions={snapshot.positions} />
+            </div>
           ) : (
             <EmptyState
               title="No live positions yet"
@@ -54,7 +58,7 @@ export default async function DashboardPage({
               {snapshot.autonomousModeEnabled ? "Autonomous" : "Human approval"}
             </Badge>
             <p className="text-sm leading-6 text-slate-600">
-              The agent loop can be run on demand from the UI and on schedule from the worker. Every cycle persists live snapshots, policy evaluation, and the resulting transaction plan.
+              The agent loop can be run on demand from the UI. In a Vercel preview, this is the fastest way to inspect the live Aave opportunity set and the current stablecoin exposure across supported chains.
             </p>
           </div>
           <RunAgentButton walletAddress={snapshot.walletAddress} />

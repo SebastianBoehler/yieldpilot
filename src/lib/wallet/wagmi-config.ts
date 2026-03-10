@@ -8,9 +8,10 @@ const walletConnectConnector = publicEnv.walletConnectProjectId
   : [];
 
 export const walletConfig = createConfig({
+  multiInjectedProviderDiscovery: false,
   chains: [arbitrum, base, optimism],
   connectors: [
-    injected(),
+    injected({ target: "metaMask" }),
     ...walletConnectConnector,
   ],
   transports: {

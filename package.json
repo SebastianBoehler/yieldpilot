@@ -23,8 +23,10 @@
     "nextjs",
     "typescript"
   ],
+  "packageManager": "bun@1.3.5",
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "bun": ">=1.3.5"
   },
   "scripts": {
     "postinstall": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} prisma generate",

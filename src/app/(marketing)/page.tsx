@@ -8,7 +8,7 @@ const highlights = [
   {
     icon: Bot,
     title: "Google ADK agent stack",
-    description: "Strategy, risk, execution, and portfolio agents work as a real sequential ADK workflow instead of a single opaque prompt.",
+    description: "Portfolio and market analysts run in parallel, then strategy, risk, execution, and portfolio agents hand off through a real ADK workflow instead of a single opaque prompt.",
   },
   {
     icon: Waypoints,

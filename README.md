@@ -78,12 +78,19 @@ Base is currently `USDC`-first because that is the cleanest reliable Aave stable
 
 ### Agent system
 
+- `Portfolio Analyst`: inspects current exposure, concentration, and monitoring priorities
+- `Market Analyst`: inspects live yield markets and route economics
 - `Strategy Agent`: evaluates live opportunities and produces the rebalance thesis
 - `Risk Agent`: validates chains, protocols, assets, caps, cooldowns, and benefit thresholds
 - `Execution Agent`: prepares allowance, bridge, swap, withdrawal, and deposit steps
 - `Portfolio Agent`: summarizes allocation state, effective APY, and run outcomes
 
-The deterministic planner computes candidates and execution plans. Google ADK then reviews and structures the decision output that is persisted and surfaced in the UI.
+The deterministic planner computes candidates and execution plans. Google ADK then runs a documented workflow shape:
+
+- `ParallelAgent`: portfolio and market analysis run in parallel over shared session state
+- `SequentialAgent`: strategy, risk, execution, and portfolio handoff run in order with `outputKey`-based state passing
+
+This keeps the ADK layer closer to the official workflow patterns instead of treating ADK like a single prompt wrapper.
 
 ### Execution loop
 
@@ -192,15 +199,15 @@ If `GOOGLE_API_KEY` is not set, the deterministic planner still runs and the ADK
 Install dependencies and bootstrap the database:
 
 ```bash
-npm install
-npm run db:generate
-npm run db:push
+bun install
+bun run db:generate
+bun run db:push
 ```
 
 Start the app:
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -208,7 +215,7 @@ Open [http://localhost:3000](http://localhost:3000).
 Start the recurring agent worker in a second terminal:
 
 ```bash
-npm run worker
+bun run worker
 ```
 
 ## Vercel preview
@@ -227,13 +234,15 @@ The preview flow is meant for:
 - generating a live plan
 - executing that plan from a connected EVM wallet
 
+Vercel will detect `bun.lock` and the `packageManager` field in `package.json`, so installs and builds run through Bun instead of npm.
+
 ## Quality checks
 
 ```bash
-npm run lint
-npm run test
-npm run db:push
-npm run build
+bun run lint
+bun run test
+bun run db:push
+bun run build
 ```
 
 ## GitHub workflows

@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "npm run db:push && npm run start"
+    command: sh -c "bun run db:push && bun run start"
     env_file:
       - .env
     environment:
@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: sh -c "npm run db:push && npm run worker"
+    command: sh -c "bun run db:push && bun run worker"
     env_file:
       - .env
     environment:

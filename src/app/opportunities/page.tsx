@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Panel } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { formatPercent, formatUsd } from "@/lib/utils/format";
+import { getAaveStableOpportunities } from "@/lib/protocols/aave-v3";
 import { selectBestCandidate } from "@/lib/orchestration/rebalance";
 import { buildDefaultStrategyPolicy } from "@/server/services/strategy-service";
 import type { ConnectedWalletType } from "@/types/domain";
@@ -19,41 +20,44 @@ export default async function OpportunitiesPage({
   const params = await searchParams;
   const wallet = typeof params.wallet === "string" ? params.wallet : undefined;
   const walletType = params.walletType === "solana" ? "solana" : "evm";
-
-  if (!wallet) {
-    return (
-      <AppShell currentPath="/opportunities" walletBar={<WalletBar walletType={walletType as ConnectedWalletType} />}>
-        <EmptyState title="Connect a wallet first" description="YieldPilot only surfaces live opportunities after it can price your current positions." />
-      </AppShell>
-    );
-  }
-
-  if (walletType === "solana") {
-    return (
-      <AppShell currentPath="/opportunities" walletBar={<WalletBar walletAddress={wallet} walletType="solana" />}>
-        <Panel className="space-y-6">
-          <SectionHeading
-            eyebrow="Solana wallet support"
-            title="Portfolio visibility is live"
-            description="Phantom Solana wallet support is active for asset visibility on the dashboard. The current rebalance and yield execution adapters still target the supported EVM Aave plus LI.FI flow."
-          />
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-6 text-sm leading-7 text-slate-600">
-            Connect a Solana wallet to inspect assets. To route capital and deposit into yield contracts today, switch to the EVM wallet mode. Solana-native yield adapters and transaction flows are the next layer.
-          </div>
-        </Panel>
-      </AppShell>
-    );
-  }
-
-  const data = await selectBestCandidate({
-    walletAddress: wallet as `0x${string}`,
-    policy: buildDefaultStrategyPolicy(),
-  });
+  const opportunities = await getAaveStableOpportunities();
+  const data =
+    wallet && walletType === "evm"
+      ? await selectBestCandidate({
+          walletAddress: wallet as `0x${string}`,
+          policy: buildDefaultStrategyPolicy(),
+        })
+      : {
+          positions: [],
+          opportunities,
+          candidates: [],
+        };
 
   return (
-    <AppShell currentPath="/opportunities" walletBar={<WalletBar walletAddress={wallet} walletType="evm" />}>
+    <AppShell currentPath="/opportunities" walletBar={<WalletBar walletAddress={wallet} walletType={walletType as ConnectedWalletType} />}>
       <div className="space-y-6">
-        <LiveRebalanceCard walletAddress={wallet} />
+        {wallet && walletType === "evm" ? (
+          <LiveRebalanceCard walletAddress={wallet} />
+        ) : walletType === "solana" ? (
+          <Panel className="space-y-4">
+            <SectionHeading
+              eyebrow="Market discovery"
+              title="Live opportunities do not require a wallet"
+              description="YieldPilot fetches lending markets from supported chain RPC endpoints. A wallet is only required once the app needs to inspect your current positions or prepare a transaction plan."
+            />
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-6 text-sm leading-7 text-slate-600">
+              Phantom Solana can stay connected for portfolio visibility. These opportunities are still EVM yield destinations, so execution remains EVM-only for now.
+            </div>
+          </Panel>
+        ) : (
+          <Panel className="space-y-4">
+            <SectionHeading
+              eyebrow="Market discovery"
+              title="Browse opportunities without connecting a wallet"
+              description="The rates below come from live Aave RPC reads on supported chains. Connect an EVM wallet only when you want YieldPilot to compare against your balances and build a rebalance transaction sequence."
+            />
+          </Panel>
+        )}
         <Panel className="space-y-6">
           <SectionHeading
             eyebrow="Live opportunity set"
@@ -101,7 +105,7 @@ export default async function OpportunitiesPage({
               </div>
             </>
           ) : (
-            <EmptyState title="No opportunities loaded" description="Run the app with a supported wallet to load the live Aave reserve set." />
+            <EmptyState title="No opportunities loaded" description="YieldPilot could not read the current reserve set from the supported chain RPC endpoints." />
           )}
         </Panel>
       </div>

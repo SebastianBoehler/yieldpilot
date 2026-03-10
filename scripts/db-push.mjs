@@ -3,9 +3,10 @@ import { closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
 
 const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
+const packageRunner = process.versions.bun ? "bunx" : "npx";
 
 if (!databaseUrl.startsWith("file:")) {
-  execFileSync("npx", ["prisma", "db", "push"], {
+  execFileSync(packageRunner, ["prisma", "db", "push"], {
     stdio: "inherit",
     env: {
       ...process.env,
@@ -24,7 +25,7 @@ mkdirSync(path.dirname(dbPath), { recursive: true });
 closeSync(openSync(dbPath, "a"));
 
 const sql = execFileSync(
-  "npx",
+  packageRunner,
   [
     "prisma",
     "migrate",

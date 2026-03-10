@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { useSolanaWallet } from "@/components/providers/solana-wallet-provider";
 import { shortenAddress } from "@/lib/utils/format";
+import { asErrorMessage } from "@/lib/utils/number";
 import type { ConnectedWalletType } from "@/types/domain";
 
 export function WalletBar({
@@ -21,6 +22,7 @@ export function WalletBar({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showConnectors, setShowConnectors] = useState(false);
+  const [connectionError, setConnectionError] = useState<string>();
   const { address, isConnected, chain } = useAccount();
   const connect = useConnect();
   const disconnect = useDisconnect();
@@ -104,7 +106,7 @@ export function WalletBar({
   }, [activeWalletType, address, pathname, router, searchParams, solanaWallet.address]);
 
   return (
-    <Panel className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <Panel className="relative z-50 overflow-visible flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Active treasury</p>
         <div className="mt-2 flex items-center gap-3">
@@ -120,7 +122,7 @@ export function WalletBar({
                   : "Connect Phantom Solana for Solana wallet visibility."
                 : chain?.name
                   ? `${chain.name} connected`
-                  : "Connect an EVM wallet such as Phantom, MetaMask, or WalletConnect."}
+                  : "Connect an EVM wallet such as MetaMask or WalletConnect."}
             </p>
           </div>
         </div>
@@ -135,6 +137,7 @@ export function WalletBar({
             variant="ghost"
             onClick={() => {
               disconnect.disconnect();
+              setConnectionError(undefined);
               setShowConnectors(false);
             }}
           >
@@ -146,6 +149,7 @@ export function WalletBar({
             variant="ghost"
             onClick={async () => {
               await solanaWallet.disconnect();
+              setConnectionError(undefined);
               setShowConnectors(false);
             }}
           >
@@ -153,12 +157,17 @@ export function WalletBar({
           </Button>
         ) : null}
         <div className="relative">
-          <Button onClick={() => setShowConnectors((current) => !current)}>
+          <Button
+            onClick={() => {
+              setConnectionError(undefined);
+              setShowConnectors((current) => !current);
+            }}
+          >
             {activeAddress ? "Switch wallet" : "Connect wallet"}
             <ChevronDown className="ml-2 size-4" />
           </Button>
           {showConnectors ? (
-            <div className="absolute right-0 z-20 mt-3 min-w-64 rounded-[24px] border border-slate-200 bg-white p-3 shadow-[0_20px_40px_-16px_rgba(15,23,42,0.35)]">
+            <div className="absolute right-0 z-[80] mt-3 min-w-72 rounded-[24px] border border-slate-200 bg-white p-3 shadow-[0_20px_40px_-16px_rgba(15,23,42,0.35)]">
               <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">EVM wallets</p>
               <div className="grid gap-2">
                 {availableConnectors.map((connector) => (
@@ -167,17 +176,22 @@ export function WalletBar({
                     className="rounded-2xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={connect.isPending}
                     onClick={async () => {
-                      const result = await connect.connectAsync({ connector });
-                      const nextParams = new URLSearchParams(searchParams.toString());
-                      const nextAddress = result.accounts[0];
-                      if (nextAddress) {
-                        nextParams.set("wallet", nextAddress.toLowerCase());
+                      setConnectionError(undefined);
+                      try {
+                        const result = await connect.connectAsync({ connector });
+                        const nextParams = new URLSearchParams(searchParams.toString());
+                        const nextAddress = result.accounts[0];
+                        if (nextAddress) {
+                          nextParams.set("wallet", nextAddress.toLowerCase());
+                        }
+                        nextParams.set("walletType", "evm");
+                        startTransition(() => {
+                          router.replace(`${pathname}?${nextParams.toString()}`);
+                        });
+                        setShowConnectors(false);
+                      } catch (error) {
+                        setConnectionError(asErrorMessage(error));
                       }
-                      nextParams.set("walletType", "evm");
-                      startTransition(() => {
-                        router.replace(`?${nextParams.toString()}`);
-                      });
-                      setShowConnectors(false);
                     }}
                     type="button"
                   >
@@ -194,20 +208,30 @@ export function WalletBar({
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={!solanaWallet.isPhantomInstalled || solanaWallet.isConnecting}
                   onClick={async () => {
-                    const nextAddress = await solanaWallet.connect();
-                    const nextParams = new URLSearchParams(searchParams.toString());
-                    nextParams.set("wallet", nextAddress);
-                    nextParams.set("walletType", "solana");
-                    startTransition(() => {
-                      router.replace(`?${nextParams.toString()}`);
-                    });
-                    setShowConnectors(false);
+                    setConnectionError(undefined);
+                    try {
+                      const nextAddress = await solanaWallet.connect();
+                      const nextParams = new URLSearchParams(searchParams.toString());
+                      nextParams.set("wallet", nextAddress);
+                      nextParams.set("walletType", "solana");
+                      startTransition(() => {
+                        router.replace(`${pathname}?${nextParams.toString()}`);
+                      });
+                      setShowConnectors(false);
+                    } catch (error) {
+                      setConnectionError(asErrorMessage(error));
+                    }
                   }}
                   type="button"
                 >
                   {solanaWallet.isPhantomInstalled ? "Phantom (Solana)" : "Phantom (Solana not detected)"}
                 </button>
               </div>
+              {connectionError ? (
+                <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  {connectionError}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -1,7 +1,22 @@
-import { FunctionTool, InMemoryRunner, LlmAgent, SequentialAgent } from "@google/adk";
+import { InMemoryRunner, LlmAgent, ParallelAgent, SequentialAgent } from "@google/adk";
+import type { ReadonlyContext } from "@google/adk";
 import { z } from "zod";
 import { env, hasGoogleAdkCredentials } from "@/lib/config/env";
 import type { ExecutionPlan, PolicyResult, RebalanceCandidate } from "@/types/domain";
+
+const portfolioAnalysisSchema = z.object({
+  summary: z.string(),
+  sourceOfTruth: z.string(),
+  concentrationRisk: z.enum(["low", "medium", "high"]),
+  monitoringFocus: z.string(),
+});
+
+const marketAnalysisSchema = z.object({
+  summary: z.string(),
+  bestMarketLabel: z.string(),
+  routeAssessment: z.string(),
+  confidence: z.number().min(0).max(1),
+});
 
 const strategyOutputSchema = z.object({
   action: z.enum(["rebalance", "hold"]),
@@ -45,6 +60,26 @@ type AdkReviewOutput = {
   executionOutput: z.infer<typeof executionOutputSchema>;
   portfolioOutput: z.infer<typeof portfolioOutputSchema>;
 };
+
+function stringifyState(value: unknown) {
+  return JSON.stringify(value ?? null, null, 2);
+}
+
+function stateInstruction(
+  intro: string,
+  sections: Array<{
+    title: string;
+    key: string;
+  }>,
+) {
+  return (context: ReadonlyContext) => {
+    const renderedSections = sections
+      .map(({ title, key }) => `${title}:\n${stringifyState(context.state.get(key))}`)
+      .join("\n\n");
+
+    return `${intro}\n\n${renderedSections}`;
+  };
+}
 
 function buildFallbackReview(input: AdkReviewInput): AdkReviewOutput {
   const strategyOutput = input.candidate
@@ -110,50 +145,52 @@ function buildFallbackReview(input: AdkReviewInput): AdkReviewOutput {
   };
 }
 
-function createRootAgent() {
-  const strategyContextTool = new FunctionTool({
-    name: "load_strategy_context",
-    description: "Load the current portfolio, opportunity universe, and top-ranked candidate.",
-    execute: (_input, toolContext) => toolContext?.state.get("strategy_context"),
+export function createYieldPilotWorkflowAgent() {
+  const portfolioAnalyst = new LlmAgent({
+    name: "portfolio_analyst",
+    model: env.GOOGLE_GENAI_MODEL,
+    description: "Analyzes current allocations, concentration risk, and what part of the portfolio matters most for the next move.",
+    includeContents: "none",
+    instruction: stateInstruction(
+      "You are the YieldPilot portfolio analysis skill. Use only the provided JSON state. Explain the current allocation, concentration risk, and what should be monitored if the agent acts. Return JSON only.",
+      [
+        { title: "Portfolio context", key: "portfolio_context" },
+        { title: "Review context", key: "review_context" },
+      ],
+    ),
+    outputSchema: portfolioAnalysisSchema,
+    outputKey: "portfolio_analysis",
   });
 
-  const riskContextTool = new FunctionTool({
-    name: "load_risk_context",
-    description: "Load the policy evaluation context and the strategy output.",
-    execute: (_input, toolContext) => ({
-      policyContext: toolContext?.state.get("risk_context"),
-      strategyOutput: toolContext?.state.get("strategy_output"),
-    }),
-  });
-
-  const executionContextTool = new FunctionTool({
-    name: "load_execution_context",
-    description: "Load the execution plan, policy result, and strategy output.",
-    execute: (_input, toolContext) => ({
-      executionContext: toolContext?.state.get("execution_context"),
-      strategyOutput: toolContext?.state.get("strategy_output"),
-      riskOutput: toolContext?.state.get("risk_output"),
-    }),
-  });
-
-  const portfolioContextTool = new FunctionTool({
-    name: "load_portfolio_context",
-    description: "Load the final execution state and current portfolio telemetry.",
-    execute: (_input, toolContext) => ({
-      portfolioContext: toolContext?.state.get("portfolio_context"),
-      strategyOutput: toolContext?.state.get("strategy_output"),
-      riskOutput: toolContext?.state.get("risk_output"),
-      executionOutput: toolContext?.state.get("execution_output"),
-    }),
+  const marketAnalyst = new LlmAgent({
+    name: "market_analyst",
+    model: env.GOOGLE_GENAI_MODEL,
+    description: "Analyzes the current yield universe, destination attractiveness, and route economics.",
+    includeContents: "none",
+    instruction: stateInstruction(
+      "You are the YieldPilot market analysis skill. Use only the supplied JSON state. Summarize the best available market, comment on route economics, and assign confidence to the attractiveness of the candidate. Return JSON only.",
+      [
+        { title: "Market context", key: "market_context" },
+        { title: "Review context", key: "review_context" },
+      ],
+    ),
+    outputSchema: marketAnalysisSchema,
+    outputKey: "market_analysis",
   });
 
   const strategyAgent = new LlmAgent({
     name: "strategy_agent",
     model: env.GOOGLE_GENAI_MODEL,
-    description: "Evaluates yield opportunities and decides whether a rebalance is worth proposing.",
-    instruction:
-      "Call load_strategy_context exactly once. Use the live context to decide whether YieldPilot should rebalance or hold. Return JSON only.",
-    tools: [strategyContextTool],
+    description: "Turns the parallel analyses into a treasury action recommendation.",
+    includeContents: "none",
+    instruction: stateInstruction(
+      "You are the YieldPilot strategy agent. Use the portfolio and market analyses plus the candidate context to decide whether the agent should rebalance or hold. If no candidate exists, action must be hold. Return JSON only.",
+      [
+        { title: "Review context", key: "review_context" },
+        { title: "Portfolio analysis", key: "portfolio_analysis" },
+        { title: "Market analysis", key: "market_analysis" },
+      ],
+    ),
     outputSchema: strategyOutputSchema,
     outputKey: "strategy_output",
   });
@@ -161,10 +198,15 @@ function createRootAgent() {
   const riskAgent = new LlmAgent({
     name: "risk_agent",
     model: env.GOOGLE_GENAI_MODEL,
-    description: "Checks whether the proposed rebalance fits the policy and approval mode.",
-    instruction:
-      "Call load_risk_context exactly once. Validate the proposal against the provided policy result. Return JSON only.",
-    tools: [riskContextTool],
+    description: "Validates the proposed action against policy and approval mode.",
+    includeContents: "none",
+    instruction: stateInstruction(
+      "You are the YieldPilot risk and policy agent. Use the structured policy result as the source of truth, then explain whether the recommendation is allowed and whether human approval is required. Return JSON only.",
+      [
+        { title: "Risk context", key: "risk_context" },
+        { title: "Strategy output", key: "strategy_output" },
+      ],
+    ),
     outputSchema: riskOutputSchema,
     outputKey: "risk_output",
   });
@@ -172,10 +214,16 @@ function createRootAgent() {
   const executionAgent = new LlmAgent({
     name: "execution_agent",
     model: env.GOOGLE_GENAI_MODEL,
-    description: "Determines whether the plan should be queued for approval, executed, or blocked.",
-    instruction:
-      "Call load_execution_context exactly once. Use the supplied execution plan and approval mode to produce the execution decision. Return JSON only.",
-    tools: [executionContextTool],
+    description: "Determines whether the plan should be queued, executed, or blocked.",
+    includeContents: "none",
+    instruction: stateInstruction(
+      "You are the YieldPilot execution agent. Use the execution context, the strategy output, and the risk output. If there is no execution plan, mode must be blocked. If human approval is required, mode must be queue_approval. Otherwise mode must be execute. Return JSON only.",
+      [
+        { title: "Execution context", key: "execution_context" },
+        { title: "Strategy output", key: "strategy_output" },
+        { title: "Risk output", key: "risk_output" },
+      ],
+    ),
     outputSchema: executionOutputSchema,
     outputKey: "execution_output",
   });
@@ -183,17 +231,39 @@ function createRootAgent() {
   const portfolioAgent = new LlmAgent({
     name: "portfolio_agent",
     model: env.GOOGLE_GENAI_MODEL,
-    description: "Summarizes the loop outcome and the monitoring focus after the decision.",
-    instruction:
-      "Call load_portfolio_context exactly once. Summarize the loop outcome and the next monitoring focus. Return JSON only.",
-    tools: [portfolioContextTool],
+    description: "Produces the post-decision monitoring summary for the treasury loop.",
+    includeContents: "none",
+    instruction: stateInstruction(
+      "You are the YieldPilot portfolio agent. Summarize the outcome of the loop, state what should be monitored next, and explain the next operational step. Return JSON only.",
+      [
+        { title: "Portfolio context", key: "portfolio_context" },
+        { title: "Portfolio analysis", key: "portfolio_analysis" },
+        { title: "Market analysis", key: "market_analysis" },
+        { title: "Strategy output", key: "strategy_output" },
+        { title: "Risk output", key: "risk_output" },
+        { title: "Execution output", key: "execution_output" },
+      ],
+    ),
     outputSchema: portfolioOutputSchema,
     outputKey: "portfolio_output",
   });
 
+  const analysisWorkflow = new ParallelAgent({
+    name: "analysis_workflow",
+    description: "Runs portfolio and market analysis in parallel on the shared session state.",
+    subAgents: [portfolioAnalyst, marketAnalyst],
+  });
+
+  const decisionWorkflow = new SequentialAgent({
+    name: "decision_workflow",
+    description: "Executes the documented strategy, risk, execution, and monitoring handoff in order.",
+    subAgents: [strategyAgent, riskAgent, executionAgent, portfolioAgent],
+  });
+
   return new SequentialAgent({
     name: "yieldpilot_root",
-    subAgents: [strategyAgent, riskAgent, executionAgent, portfolioAgent],
+    description: "YieldPilot ADK workflow composed of parallel analysis followed by sequential decision agents.",
+    subAgents: [analysisWorkflow, decisionWorkflow],
   });
 }
 
@@ -204,17 +274,15 @@ export async function runAdkReview(input: AdkReviewInput): Promise<AdkReviewOutp
 
   const runner = new InMemoryRunner({
     appName: "YieldPilot",
-    agent: createRootAgent(),
+    agent: createYieldPilotWorkflowAgent(),
   });
 
   const session = await runner.sessionService.createSession({
     appName: "YieldPilot",
     userId: input.walletAddress,
     state: {
-      strategy_context: {
+      review_context: {
         walletAddress: input.walletAddress,
-        positions: input.positions,
-        opportunities: input.opportunities.slice(0, 8),
         candidate: input.candidate
           ? {
               amountUsd: input.candidate.amountUsd,
@@ -236,6 +304,15 @@ export async function runAdkReview(input: AdkReviewInput): Promise<AdkReviewOutp
             }
           : null,
       },
+      portfolio_context: {
+        walletAddress: input.walletAddress,
+        totalPositions: input.positions.length,
+        positions: input.positions.slice(0, 8),
+      },
+      market_context: {
+        totalOpportunities: input.opportunities.length,
+        opportunities: input.opportunities.slice(0, 8),
+      },
       risk_context: {
         policyResult: input.policyResult,
       },
@@ -254,10 +331,6 @@ export async function runAdkReview(input: AdkReviewInput): Promise<AdkReviewOutp
             }
           : null,
       },
-      portfolio_context: {
-        totalPositions: input.positions.length,
-        totalOpportunities: input.opportunities.length,
-      },
     },
   });
 
@@ -270,7 +343,7 @@ export async function runAdkReview(input: AdkReviewInput): Promise<AdkReviewOutp
     },
   })) {
     void event;
-    // Drain the event stream so ADK persists state outputs for each sub-agent.
+    // Drain the workflow events so ADK persists sub-agent outputs into session state.
   }
 
   const completedSession = await runner.sessionService.getSession({

@@ -7,18 +7,18 @@ import { SectionHeading } from "@/components/ui/section-heading";
 const highlights = [
   {
     icon: Bot,
-    title: "Google ADK agent stack",
-    description: "Portfolio and market analysts run in parallel, then strategy, risk, execution, and portfolio agents hand off through a real ADK workflow instead of a single opaque prompt.",
+    title: "Generic action loop",
+    description: "Portfolio and market analysts still run through the ADK workflow, but execution now flows through a generic action model, protocol adapters, and a persistent cycle trace.",
   },
   {
     icon: Waypoints,
-    title: "LI.FI capital movement layer",
-    description: "Every rebalance route is priced, prepared, and tracked through LI.FI so bridge cost, gas, and slippage stay in the decision loop.",
+    title: "Gas-aware protocol execution",
+    description: "DEX, bridge, and lending actions run through adapter interfaces that price cost and compatibility first, then request sponsorship or fall back cleanly.",
   },
   {
     icon: ShieldCheck,
     title: "Policy-first autonomy",
-    description: "Human approval and autonomous execution share the same transaction planner, allowance checks, and audit trail.",
+    description: "Human approval and autonomous execution share the same hardcoded limits, simulations, circuit breaker, and audit trail.",
   },
 ];
 
@@ -30,14 +30,14 @@ export default function MarketingPage() {
           <div className="grid gap-10 lg:grid-cols-[1.35fr_0.85fr]">
             <div className="space-y-8 p-2">
               <p className="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-teal-200">
-                YieldPilot MVP
+                YieldPilot Main Agent
               </p>
               <div className="space-y-5">
                 <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] tracking-tight lg:text-7xl">
-                  Autonomous cross-chain treasury management for stablecoins.
+                  Autonomous onchain agent infrastructure with yield as the first live strategy.
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-slate-300">
-                  YieldPilot scans live Aave stablecoin markets across Arbitrum, Base, and Optimism, prices the net carry after bridge and gas costs, and then routes capital with LI.FI under explicit risk policy.
+                  YieldPilot now centers on a production-oriented action loop with gas-aware execution, protocol adapters, safety guards, and Railway deployment. The original yield optimizer remains live as the first strategy pack on top of that runtime.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -61,24 +61,24 @@ export default function MarketingPage() {
                   <div>
                     <h3 className="text-lg font-semibold">Human approval</h3>
                     <p className="mt-1 text-sm leading-6 text-slate-300">
-                      YieldPilot prepares the full transaction chain, exposes every allowance change, and waits for the user to sign each step.
+                      YieldPilot prepares the full action bundle, exposes every allowance change, and waits for approval before any live submission.
                     </p>
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">Autonomous</h3>
                     <p className="mt-1 text-sm leading-6 text-slate-300">
-                      A backend execution wallet can rebalance on schedule inside daily limits, protocol allowlists, and slippage guards.
+                      A backend execution wallet can act on schedule inside daily limits, contract allowlists, simulation requirements, and circuit-breaker controls.
                     </p>
                   </div>
                 </div>
               </Panel>
               <Panel className="bg-linear-to-br from-teal-500/20 to-orange-400/20 text-white">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/70">What gets optimized</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/70">What ships live in phase 1</p>
                 <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-100">
-                  <li>Live deposit APY from official Aave RPC reads</li>
-                  <li>Bridge, swap, and gas drag through LI.FI routes</li>
-                  <li>Cooldown windows and protocol / chain / asset allowlists</li>
-                  <li>Explicit approval and transaction audit records in SQLite</li>
+                  <li>Yield-agent strategy using official Aave RPC data</li>
+                  <li>DEX and bridge routing through LI.FI adapters</li>
+                  <li>Hardcoded risk limits, simulations, and action caps</li>
+                  <li>Persistent cycle, action, and transaction audit records in Postgres</li>
                 </ul>
               </Panel>
             </div>
@@ -103,15 +103,15 @@ export default function MarketingPage() {
         <Panel>
           <SectionHeading
             eyebrow="Execution loop"
-            title="How YieldPilot decides"
-            description="Each loop starts with live position discovery, scores alternative allocations after route costs, validates policy, then either queues approval or executes the plan."
+            title="How the main agent decides"
+            description="Each cycle starts with live position discovery, normalizes candidate actions, validates hard risk limits, simulates supported actions, and only then queues or executes the plan."
           />
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {[
               "Fetch live positions",
-              "Scan stablecoin markets",
-              "Price LI.FI routes",
-              "Validate policy",
+              "Collect strategy signals",
+              "Quote protocol actions",
+              "Validate and simulate",
               "Queue or execute",
             ].map((step, index) => (
               <div key={step} className="rounded-[24px] border border-slate-200 bg-white px-5 py-6">

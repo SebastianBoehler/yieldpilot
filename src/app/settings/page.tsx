@@ -36,15 +36,16 @@ export default async function SettingsPage({
     <AppShell currentPath="/settings" walletBar={<WalletBar walletAddress={base?.user.walletAddress} walletType="evm" />}>
       <Panel className="space-y-6">
         <SectionHeading
-          eyebrow="Strategy settings"
-          title="Policy and autonomy controls"
-          description="Adjust the mode, risk profile, throughput limits, and allowlists that gate every YieldPilot rebalance."
+          eyebrow="Agent policy"
+          title="Onchain execution and safety controls"
+          description="Adjust autonomy, action limits, allowlists, simulation requirements, and gasless-execution preferences for the main autonomous agent while keeping the yield strategy pack live."
         />
         {base ? (
           <SettingsForm
             payload={{
               walletAddress: base.user.walletAddress,
               strategy: {
+                strategyKey: base.strategy.strategyKey,
                 mode: base.strategy.mode,
                 riskProfile: base.strategy.riskProfile,
                 rebalanceThresholdBps: base.strategy.rebalanceThresholdBps,

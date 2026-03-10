@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -51,6 +51,26 @@ enum TransactionStatus {
   SKIPPED
 }
 
+enum ActionStatus {
+  PENDING
+  QUOTED
+  VALIDATED
+  SIMULATED
+  BLOCKED
+  EXECUTING
+  EXECUTED
+  FAILED
+  UNSUPPORTED
+}
+
+enum SponsorshipStatus {
+  NOT_REQUESTED
+  ELIGIBLE
+  SPONSORED
+  UNSUPPORTED
+  DENIED
+}
+
 model User {
   id               String             @id @default(cuid())
   walletAddress    String             @unique
@@ -60,12 +80,15 @@ model User {
   approvalRequests ApprovalRequest[]
   executionLogs    ExecutionLog[]
   agentRuns        AgentRun[]
+  agentCycles      AgentCycle[]
+  actionRequests   ActionRequest[]
 }
 
 model Strategy {
   id                   String               @id @default(cuid())
   userId               String
   name                 String
+  strategyKey          String               @default("yield-agent")
   mode                 StrategyMode         @default(HUMAN_APPROVAL)
   riskProfile          RiskProfile          @default(BALANCED)
   rebalanceThresholdBps Int                 @default(50)
@@ -84,6 +107,12 @@ model Strategy {
   rebalanceDecisions   RebalanceDecision[]
   approvalRequests     ApprovalRequest[]
   agentRuns            AgentRun[]
+  agentCycles          AgentCycle[]
+  actionRequests       ActionRequest[]
+  protocolLogs         ProtocolLog[]
+  circuitBreakerState  CircuitBreakerState?
+  capabilitySnapshots  ExecutionCapabilitySnapshot[]
+  workerLeases         WorkerLease[]
 }
 
 model PolicyConfig {
@@ -92,6 +121,9 @@ model PolicyConfig {
   approvedChains                 Json
   approvedProtocols              Json
   approvedAssets                 Json
+  approvedContractAddresses      Json        @default("[]")
+  approvedMethodSelectors        Json        @default("[]")
+  approvedActionKinds            Json        @default("[\"swap\",\"bridge_swap\",\"lend_deposit\",\"lend_withdraw\",\"borrow\",\"repay\",\"yield_deposit\",\"yield_withdraw\",\"approve\",\"permit\"]")
   protocolPermanentApprovals     Json
   protocolAmountThresholds       Json
   maxTransactionUsd              Float       @default(10000)
@@ -99,6 +131,23 @@ model PolicyConfig {
   maxSlippageBps                 Int         @default(30)
   dailyMovedLimitUsd             Float?      @default(25000)
   stopLossBps                    Int?
+  maxApprovalUsd                 Float       @default(5000)
+  maxApprovalAmount              Float       @default(5000)
+  maxDailyActions                Int         @default(12)
+  maxActionsPerCycle             Int         @default(4)
+  maxReasoningSteps              Int         @default(6)
+  cycleTimeoutMs                 Int         @default(120000)
+  maxLeverage                    Float       @default(1)
+  maxOpenPositions               Int         @default(3)
+  maxNftPurchaseUsd              Float       @default(250)
+  maxVaultDepositUsd             Float       @default(5000)
+  circuitBreakerThreshold        Int         @default(3)
+  circuitBreakerWindowMinutes    Int         @default(60)
+  collateralHealthThresholdBps   Int         @default(12000)
+  requireSimulation              Boolean     @default(true)
+  liveExecutionEnabled           Boolean     @default(false)
+  enableSmartAccounts            Boolean     @default(false)
+  enableGasSponsorship           Boolean     @default(false)
   autoApproveTrustedProtocols    Boolean     @default(false)
   allowUnlimitedApprovals        Boolean     @default(false)
   createdAt                      DateTime    @default(now())
@@ -244,4 +293,146 @@ model AgentRun {
   user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   strategy            Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
   decisions           RebalanceDecision[]
+  agentCycles         AgentCycle[]
+}
+
+model AgentCycle {
+  id                  String                       @id @default(cuid())
+  userId              String
+  strategyId          String
+  agentRunId          String?
+  status              RunStatus                    @default(RUNNING)
+  strategyKey         String
+  summary             String?
+  liveExecutionEnabled Boolean                     @default(false)
+  maxReasoningSteps   Int
+  maxActionsPerCycle  Int
+  startedAt           DateTime                     @default(now())
+  completedAt         DateTime?
+  inputs              Json
+  outputs             Json?
+  error               String?
+  user                User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy            Strategy                     @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentRun            AgentRun?                    @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  actionRequests      ActionRequest[]
+  protocolLogs        ProtocolLog[]
+  decisionTraces      DecisionTrace[]
+
+  @@index([strategyId, startedAt])
+}
+
+model ActionRequest {
+  id                   String             @id @default(cuid())
+  userId               String
+  strategyId           String
+  agentCycleId         String
+  kind                 String
+  protocol             String
+  chainId              Int
+  status               ActionStatus       @default(PENDING)
+  sponsorshipStatus    SponsorshipStatus  @default(NOT_REQUESTED)
+  title                String
+  amountUsd            Float?
+  assetSymbol          String?
+  request              Json
+  quote                Json?
+  validation           Json?
+  simulation           Json?
+  result               Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy             Strategy           @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentCycle           AgentCycle         @relation(fields: [agentCycleId], references: [id], onDelete: Cascade)
+  executions           ActionExecution[]
+  protocolLogs         ProtocolLog[]
+
+  @@index([strategyId, createdAt])
+  @@index([agentCycleId, createdAt])
+}
+
+model ActionExecution {
+  id                   String             @id @default(cuid())
+  actionRequestId      String
+  status               ActionStatus       @default(PENDING)
+  walletProvider       String
+  gasSponsored         Boolean            @default(false)
+  sponsorshipStatus    SponsorshipStatus  @default(NOT_REQUESTED)
+  transactionHash      String?
+  explorerUrl          String?
+  sponsorMetadata      Json?
+  executionPayload     Json?
+  result               Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  actionRequest        ActionRequest      @relation(fields: [actionRequestId], references: [id], onDelete: Cascade)
+}
+
+model ProtocolLog {
+  id                   String        @id @default(cuid())
+  strategyId           String
+  agentCycleId         String?
+  actionRequestId      String?
+  protocol             String
+  event                String
+  level                String
+  payload              Json
+  createdAt            DateTime      @default(now())
+  strategy             Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentCycle           AgentCycle?   @relation(fields: [agentCycleId], references: [id], onDelete: SetNull)
+  actionRequest        ActionRequest? @relation(fields: [actionRequestId], references: [id], onDelete: SetNull)
+}
+
+model DecisionTrace {
+  id                   String        @id @default(cuid())
+  agentCycleId         String
+  step                 String
+  message              String
+  payload              Json
+  createdAt            DateTime      @default(now())
+  agentCycle           AgentCycle    @relation(fields: [agentCycleId], references: [id], onDelete: Cascade)
+
+  @@index([agentCycleId, createdAt])
+}
+
+model CircuitBreakerState {
+  id                   String        @id @default(cuid())
+  strategyId           String        @unique
+  failureCount         Int           @default(0)
+  successCount         Int           @default(0)
+  isOpen               Boolean       @default(false)
+  windowStartedAt      DateTime      @default(now())
+  openedAt             DateTime?
+  reason               String?
+  metadata             Json?
+  updatedAt            DateTime      @updatedAt
+  strategy             Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+}
+
+model ExecutionCapabilitySnapshot {
+  id                   String        @id @default(cuid())
+  strategyId           String
+  chainId              Int
+  protocol             String
+  actionKind           String
+  walletProvider       String
+  gasSponsorshipSupported Boolean
+  smartAccountSupported Boolean
+  eip7702Supported     Boolean
+  details              Json
+  capturedAt           DateTime      @default(now())
+  strategy             Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@index([strategyId, capturedAt])
+}
+
+model WorkerLease {
+  key                  String        @id
+  strategyId           String?
+  ownerId              String
+  expiresAt            DateTime
+  metadata             Json?
+  updatedAt            DateTime      @updatedAt
+  strategy             Strategy?     @relation(fields: [strategyId], references: [id], onDelete: SetNull)
 }

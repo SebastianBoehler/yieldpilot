@@ -16,7 +16,7 @@ const monoFont = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "YieldPilot",
-  description: "Autonomous cross-chain treasury management for stablecoins.",
+  description: "Autonomous onchain agent with gas-aware execution, protocol adapters, and yield optimization as the first live strategy pack.",
 };
 
 export default function RootLayout({

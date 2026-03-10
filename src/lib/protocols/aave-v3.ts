@@ -435,6 +435,88 @@ export function buildAaveWithdrawStep({
   };
 }
 
+export function buildAaveBorrowStep({
+  chainId,
+  assetAddress,
+  amount,
+  walletAddress,
+  assetSymbol,
+}: {
+  chainId: number;
+  assetAddress: `0x${string}`;
+  amount: bigint;
+  walletAddress: `0x${string}`;
+  assetSymbol: string;
+}): TransactionPlanStep {
+  const chain = CHAIN_BY_ID.get(chainId);
+  if (!chain) {
+    throw new Error(`Unsupported chain ${chainId}`);
+  }
+
+  return {
+    stepKey: `borrow-${chainId}-${assetAddress}`,
+    title: `Borrow ${assetSymbol} from ${AAVE_PROTOCOL_LABEL}`,
+    transactionType: "withdraw",
+    chainId,
+    to: chain.poolAddress,
+    data: encodeFunctionData({
+      abi: poolArtifact.abi,
+      functionName: "borrow",
+      args: [assetAddress, amount, 2, 0, walletAddress],
+    }),
+    value: "0",
+    description: `Borrow ${assetSymbol} from ${AAVE_PROTOCOL_LABEL} on ${chain.label}.`,
+    protocol: AAVE_PROTOCOL_LABEL,
+    assetSymbol,
+    metadata: {
+      assetAddress,
+      onBehalfOf: walletAddress,
+      interestRateMode: 2,
+    },
+  };
+}
+
+export function buildAaveRepayStep({
+  chainId,
+  assetAddress,
+  amount,
+  walletAddress,
+  assetSymbol,
+}: {
+  chainId: number;
+  assetAddress: `0x${string}`;
+  amount: bigint;
+  walletAddress: `0x${string}`;
+  assetSymbol: string;
+}): TransactionPlanStep {
+  const chain = CHAIN_BY_ID.get(chainId);
+  if (!chain) {
+    throw new Error(`Unsupported chain ${chainId}`);
+  }
+
+  return {
+    stepKey: `repay-${chainId}-${assetAddress}`,
+    title: `Repay ${assetSymbol} on ${AAVE_PROTOCOL_LABEL}`,
+    transactionType: "deposit",
+    chainId,
+    to: chain.poolAddress,
+    data: encodeFunctionData({
+      abi: poolArtifact.abi,
+      functionName: "repay",
+      args: [assetAddress, amount, 2, walletAddress],
+    }),
+    value: "0",
+    description: `Repay ${assetSymbol} debt on ${AAVE_PROTOCOL_LABEL} on ${chain.label}.`,
+    protocol: AAVE_PROTOCOL_LABEL,
+    assetSymbol,
+    metadata: {
+      assetAddress,
+      onBehalfOf: walletAddress,
+      interestRateMode: 2,
+    },
+  };
+}
+
 export async function estimateGasUsdForStep(step: TransactionPlanStep, from: `0x${string}`) {
   const chain = CHAIN_BY_ID.get(step.chainId);
   if (!chain || !step.data) {

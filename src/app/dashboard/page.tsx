@@ -30,9 +30,9 @@ export default async function DashboardPage({
       <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
         <Panel className="space-y-6">
           <SectionHeading
-            eyebrow="Treasury overview"
-            title="Cross-chain treasury allocation at a glance"
-            description="YieldPilot tracks the live wallet balances it can see, surfaces Aave and Kamino yield markets across the supported chains, and compares the current carry with the best routed alternative."
+            eyebrow="Agent overview"
+            title="Autonomous onchain execution at a glance"
+            description="YieldPilot tracks the live wallet balances it can see, exposes the current yield strategy pack, and runs a generic action loop with protocol adapters, hard risk limits, and gas-sponsorship awareness."
           />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard label="Portfolio value" value={formatUsd(snapshot.totalPortfolioUsd)} />
@@ -52,7 +52,7 @@ export default async function DashboardPage({
           ) : (
             <EmptyState
               title="No live positions yet"
-              description="Connect an EVM or Phantom Solana wallet to let YieldPilot fetch live wallet balances and supported yield positions."
+              description="Connect an EVM or Phantom Solana wallet to let YieldPilot fetch live wallet balances and the currently supported strategy surfaces."
             />
           )}
         </Panel>
@@ -65,7 +65,7 @@ export default async function DashboardPage({
             <p className="text-sm leading-6 text-slate-600">
               {snapshot.walletType === "solana"
                 ? "Solana wallet support currently focuses on portfolio visibility through Jupiter's official portfolio APIs. Automated yield execution still targets the supported EVM routes."
-                : "The agent loop can be run on demand from the UI. In a Vercel preview, this is the fastest way to inspect the live multi-asset opportunity set and the current supported onchain exposure across chains."}
+                : "The main agent loop can be run on demand from the UI. The live execution path is gated by hardcoded policy controls, simulation, and protocol compatibility checks before anything is submitted."}
             </p>
           </div>
           <RunAgentButton walletAddress={snapshot.walletAddress} walletType={snapshot.walletType as ConnectedWalletType | undefined} />
@@ -79,8 +79,8 @@ export default async function DashboardPage({
               {snapshot.bestOpportunity
                 ? `${snapshot.bestOpportunity.chainLabel} ${snapshot.bestOpportunity.assetSymbol} at ${formatPercent(snapshot.bestOpportunity.apy)}`
                 : snapshot.walletType === "solana"
-                  ? "Solana wallet visibility is live. Solana-native yield sourcing is the next adapter."
-                  : "Run the live scanner to populate opportunities."}
+                  ? "Solana wallet visibility is live. Solana-native execution remains adapter-scaffolded for now."
+                  : "Run the main agent loop to populate opportunities and action traces."}
             </p>
           </div>
         </Panel>

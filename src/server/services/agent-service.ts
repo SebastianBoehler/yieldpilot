@@ -1,12 +1,11 @@
 import { ApprovalStatus, DecisionStatus, Prisma, RunStatus, TransactionStatus } from "@prisma/client";
+import { runAutonomousAgentCycle } from "@/agent/cycle-runner";
 import { runAdkReview } from "@/lib/adk/runner";
-import { pollRouteStatus } from "@/lib/lifi/execution";
-import { buildDecision } from "@/lib/orchestration/rebalance";
-import { executeSignedTransaction } from "@/lib/wallet/signing-service";
-import type { AgentCycleResult, ExecutionPlan, TransactionExecutionResult } from "@/types/domain";
+import type { AgentCycleResult, ExecutionPlan, PolicyResult } from "@/types/domain";
 import { prisma } from "@/lib/db/prisma";
 import { createApprovalRequest, updateApprovalStatus } from "@/server/services/approval-service";
 import { createExecutionLog, ensureUserStrategy, persistOpportunitySnapshots, persistPositions, toStrategyPolicy } from "@/server/services/strategy-service";
+import type { AgentCycleActionResult } from "@/agent/types";
 
 async function persistDecisionTransactionPlan(rebalanceDecisionId: string, executionPlan: ExecutionPlan) {
   await prisma.transactionRecord.createMany({
@@ -25,31 +24,62 @@ async function persistDecisionTransactionPlan(rebalanceDecisionId: string, execu
   });
 }
 
-async function executeExecutionPlan(executionPlan: ExecutionPlan) {
-  const results: Array<TransactionExecutionResult & { stepKey: string }> = [];
-
-  for (const step of executionPlan.txSteps) {
-    const result = await executeSignedTransaction(step);
-    results.push({
-      ...result,
-      stepKey: step.stepKey,
-    });
-
-    if (result.status !== TransactionStatus.CONFIRMED) {
-      break;
-    }
-
-    if (step.transactionType === "bridge" && result.hash) {
-      await pollRouteStatus({
-        txHash: result.hash,
-        bridge: executionPlan.routeTool,
-        fromChain: executionPlan.sourceChainId,
-        toChain: executionPlan.destinationChainId,
-      });
-    }
+function buildExecutionPlanFromActions(actions: AgentCycleActionResult[], cycleResult: Awaited<ReturnType<typeof runAutonomousAgentCycle>>): ExecutionPlan | undefined {
+  if (!cycleResult.candidate) {
+    return undefined;
   }
 
-  return results;
+  const txSteps = actions.flatMap((action) => action.plannedBundle?.txSteps ?? []);
+  if (!txSteps.length) {
+    return undefined;
+  }
+
+  return {
+    routeId: cycleResult.candidate.routeCost.routeId,
+    sourceChainId: cycleResult.candidate.sourcePosition.chainId,
+    destinationChainId: cycleResult.candidate.destinationOpportunity.chainId,
+    sourceProtocol: cycleResult.candidate.sourcePosition.protocolLabel,
+    destinationProtocol: cycleResult.candidate.destinationOpportunity.protocolLabel,
+    sourceAsset: cycleResult.candidate.sourcePosition.assetSymbol,
+    destinationAsset: cycleResult.candidate.destinationOpportunity.assetSymbol,
+    amount: cycleResult.candidate.amount.toString(),
+    amountUsd: cycleResult.candidate.amountUsd,
+    expectedApyDelta: cycleResult.candidate.expectedApyDelta,
+    expectedNetBenefitUsd: cycleResult.candidate.expectedNetBenefitUsd,
+    bridgeCostUsd: cycleResult.candidate.routeCost.bridgeCostUsd,
+    gasCostUsd:
+      cycleResult.candidate.routeCost.gasCostUsd +
+      txSteps.reduce((sum, step) => sum + (step.estimatedGasUsd ?? 0), 0),
+    slippageBps: Math.round(cycleResult.candidate.scoreBreakdown.slippagePenalty * 100),
+    rationale: cycleResult.candidate.rationale,
+    routeTool:
+      actions.find((action) => action.request.protocol === "lifi")?.plannedBundle?.routeTool ??
+      cycleResult.candidate.routeCost.tool,
+    routeSummary: cycleResult.candidate.routeCost.routeLabel,
+    txSteps,
+  };
+}
+
+function buildPolicyResult(params: {
+  policyMode: "HUMAN_APPROVAL" | "AUTONOMOUS";
+  executionPlan?: ExecutionPlan;
+  actions: AgentCycleActionResult[];
+}): PolicyResult {
+  const reasons = params.actions.flatMap((action) => action.blockedReasons ?? []);
+
+  return {
+    allowed: Boolean(params.executionPlan) && reasons.length === 0,
+    requiresHumanApproval: params.policyMode === "HUMAN_APPROVAL" && Boolean(params.executionPlan),
+    status:
+      !params.executionPlan
+        ? DecisionStatus.NO_ACTION
+        : reasons.length > 0
+          ? DecisionStatus.BLOCKED
+          : params.policyMode === "HUMAN_APPROVAL"
+            ? DecisionStatus.QUEUED_FOR_APPROVAL
+            : DecisionStatus.EXECUTING,
+    reasons,
+  };
 }
 
 export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleResult> {
@@ -81,76 +111,62 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
   });
 
   try {
-    const latestRun = await prisma.agentRun.findFirst({
-      where: {
-        strategyId: base.strategy.id,
-        id: { not: agentRun.id },
-      },
-      orderBy: {
-        startedAt: "desc",
-      },
-    });
-    const recentDecisions = await prisma.rebalanceDecision.findMany({
-      where: {
-        strategyId: base.strategy.id,
-      },
-      select: {
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 10,
-    });
-
-    const built = await buildDecision({
+    const cycleResult = await runAutonomousAgentCycle({
       walletAddress: base.user.walletAddress as `0x${string}`,
+      userId: base.user.id,
+      strategyId: base.strategy.id,
+      strategyMode: base.strategy.mode,
       policy,
-      lastRun: latestRun,
-      recentDecisionTimestamps: recentDecisions,
+      agentRunId: agentRun.id,
+    });
+    const executionPlan = buildExecutionPlanFromActions(cycleResult.actions, cycleResult);
+    const policyResult = buildPolicyResult({
+      policyMode: base.strategy.mode,
+      executionPlan,
+      actions: cycleResult.actions,
     });
 
     await Promise.all([
-      persistPositions(base.strategy.id, built.positions),
-      persistOpportunitySnapshots(base.strategy.id, built.opportunities),
+      persistPositions(base.strategy.id, cycleResult.positions),
+      persistOpportunitySnapshots(base.strategy.id, cycleResult.opportunities),
     ]);
 
     const adkReview = await runAdkReview({
       walletAddress: base.user.walletAddress,
-      candidate: built.candidate,
-      policyResult: built.policyResult,
-      executionPlan: built.executionPlan,
-      positions: built.positions,
-      opportunities: built.opportunities,
+      candidate: cycleResult.candidate,
+      policyResult,
+      executionPlan,
+      positions: cycleResult.positions,
+      opportunities: cycleResult.opportunities,
     });
 
     const decision = await prisma.rebalanceDecision.create({
       data: {
         strategyId: base.strategy.id,
         agentRunId: agentRun.id,
-        status: built.policyResult?.status ?? DecisionStatus.NO_ACTION,
+        status: policyResult.status ?? DecisionStatus.NO_ACTION,
         summary: adkReview.strategyOutput.summary,
         reason: adkReview.strategyOutput.reason,
-        sourceChainId: built.candidate?.sourcePosition.chainId,
-        destinationChainId: built.candidate?.destinationOpportunity.chainId,
-        sourceProtocol: built.candidate?.sourcePosition.protocol,
-        destinationProtocol: built.candidate?.destinationOpportunity.protocol,
-        sourceAsset: built.candidate?.sourcePosition.assetSymbol,
-        destinationAsset: built.candidate?.destinationOpportunity.assetSymbol,
-        amount: built.candidate?.amount.toString(),
-        amountUsd: built.candidate?.amountUsd,
-        estimatedApyDelta: built.candidate?.expectedApyDelta,
-        estimatedNetBenefitUsd: built.candidate?.expectedNetBenefitUsd,
-        bridgeCostUsd: built.candidate?.routeCost.bridgeCostUsd,
-        gasCostUsd: built.executionPlan?.gasCostUsd,
-        slippageBps: built.executionPlan?.slippageBps,
-        scoreBreakdown: (built.candidate?.scoreBreakdown ?? {}) as Prisma.JsonObject,
-        actionPlan: (built.executionPlan ?? {}) as Prisma.JsonObject,
+        sourceChainId: cycleResult.candidate?.sourcePosition.chainId,
+        destinationChainId: cycleResult.candidate?.destinationOpportunity.chainId,
+        sourceProtocol: cycleResult.candidate?.sourcePosition.protocol,
+        destinationProtocol: cycleResult.candidate?.destinationOpportunity.protocol,
+        sourceAsset: cycleResult.candidate?.sourcePosition.assetSymbol,
+        destinationAsset: cycleResult.candidate?.destinationOpportunity.assetSymbol,
+        amount: cycleResult.candidate?.amount.toString(),
+        amountUsd: cycleResult.candidate?.amountUsd,
+        estimatedApyDelta: cycleResult.candidate?.expectedApyDelta,
+        estimatedNetBenefitUsd: cycleResult.candidate?.expectedNetBenefitUsd,
+        bridgeCostUsd: cycleResult.candidate?.routeCost.bridgeCostUsd,
+        gasCostUsd: executionPlan?.gasCostUsd,
+        slippageBps: executionPlan?.slippageBps,
+        scoreBreakdown: (cycleResult.candidate?.scoreBreakdown ?? {}) as Prisma.JsonObject,
+        actionPlan: (executionPlan ?? {}) as Prisma.JsonObject,
       },
     });
 
-    if (built.executionPlan) {
-      await persistDecisionTransactionPlan(decision.id, built.executionPlan);
+    if (executionPlan) {
+      await persistDecisionTransactionPlan(decision.id, executionPlan);
     }
 
     await createExecutionLog({
@@ -163,42 +179,55 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
         strategy: adkReview.strategyOutput,
         risk: adkReview.riskOutput,
         execution: adkReview.executionOutput,
+        cycle: {
+          id: cycleResult.cycleId,
+          liveExecutionEnabled: cycleResult.liveExecutionEnabled,
+          trace: cycleResult.trace,
+        },
       },
     });
 
     let approvalRequestId: string | undefined;
     let transactionHashes: string[] | undefined;
     let decisionStatus = decision.status;
-    let summary = adkReview.portfolioOutput.message;
+    let summary = cycleResult.summary;
 
-    if (!built.executionPlan) {
+    if (!executionPlan) {
       summary = adkReview.riskOutput.summary;
-    } else if (policy.dryRun) {
+    } else if (policy.dryRun || !policy.liveExecutionEnabled) {
       decisionStatus = DecisionStatus.NO_ACTION;
-      summary = "Dry-run mode is enabled. YieldPilot prepared a plan but did not execute it.";
-    } else if (built.policyResult?.requiresHumanApproval) {
+      summary = "Live execution is disabled. YieldPilot prepared a main-agent action plan but did not execute it.";
+    } else if (policyResult.requiresHumanApproval) {
       const approval = await createApprovalRequest({
         userId: base.user.id,
         strategyId: base.strategy.id,
         rebalanceDecisionId: decision.id,
-        executionPlan: built.executionPlan,
+        executionPlan,
         requestedAction: {
           strategy: adkReview.strategyOutput,
           risk: adkReview.riskOutput,
           execution: adkReview.executionOutput,
+          cycle: cycleResult.trace,
         },
       });
 
       approvalRequestId = approval.id;
       decisionStatus = DecisionStatus.QUEUED_FOR_APPROVAL;
-      summary = "A rebalance plan was queued for human approval.";
-    } else if (built.policyResult?.allowed) {
-      const results = await executeExecutionPlan(built.executionPlan);
-      transactionHashes = results.map((result) => result.hash).filter((hash): hash is string => Boolean(hash));
-      const failed = results.some((result) => result.status !== TransactionStatus.CONFIRMED);
+      summary = "An autonomous onchain action plan was queued for human approval.";
+    } else if (policyResult.allowed) {
+      const stepResults = cycleResult.actions.flatMap((action) => {
+        const stepResultsValue = action.execution?.metadata.stepResults;
+        return Array.isArray(stepResultsValue)
+          ? (stepResultsValue as Array<{ stepKey: string; hash?: string; status: TransactionStatus }>)
+          : [];
+      });
+      transactionHashes = stepResults
+        .map((result) => result.hash)
+        .filter((hash): hash is string => Boolean(hash));
+      const failed = cycleResult.actions.some((action) => action.execution?.status !== "CONFIRMED");
       decisionStatus = failed ? DecisionStatus.FAILED : DecisionStatus.EXECUTED;
 
-      for (const result of results) {
+      for (const result of stepResults) {
         await prisma.transactionRecord.updateMany({
           where: {
             rebalanceDecisionId: decision.id,
@@ -214,8 +243,8 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
       }
 
       summary = failed
-        ? "Autonomous execution failed. Review the transaction log."
-        : "Autonomous execution completed successfully.";
+        ? "Autonomous onchain execution failed. Review the transaction log."
+        : "Autonomous onchain execution completed successfully.";
     }
 
     await prisma.rebalanceDecision.update({
@@ -236,7 +265,13 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
           risk: adkReview.riskOutput,
           execution: adkReview.executionOutput,
           portfolio: adkReview.portfolioOutput,
-        },
+          cycle: {
+            id: cycleResult.cycleId,
+            strategyKey: cycleResult.strategyKey,
+            trace: cycleResult.trace,
+            liveExecutionEnabled: cycleResult.liveExecutionEnabled,
+          },
+        } as Prisma.JsonObject,
       },
     });
 
@@ -244,11 +279,11 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
       runStatus: RunStatus.COMPLETED,
       summary,
       decisionStatus,
-      positions: built.positions,
-      opportunities: built.opportunities,
-      candidate: built.candidate,
-      policyResult: built.policyResult,
-      executionPlan: built.executionPlan,
+      positions: cycleResult.positions,
+      opportunities: cycleResult.opportunities,
+      candidate: cycleResult.candidate,
+      policyResult,
+      executionPlan,
       approvalRequestId,
       transactionHashes,
     };

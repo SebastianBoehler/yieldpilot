@@ -7,6 +7,7 @@ import { scheduleLabel } from "@/lib/utils/time";
 
 export const defaultStrategyConfig = {
   name: "Primary Treasury",
+  strategyKey: "yield-agent",
   mode: StrategyMode.HUMAN_APPROVAL,
   riskProfile: RiskProfile.BALANCED,
   rebalanceThresholdBps: 50,
@@ -22,11 +23,31 @@ export const defaultPolicyConfig = {
   approvedChains: [42161, 8453, 10],
   approvedProtocols: ["aave-v3"],
   approvedAssets: ["USDC", "USDT", "DAI"],
+  approvedContractAddresses: [],
+  approvedMethodSelectors: [],
+  approvedActionKinds: ["swap", "bridge_swap", "lend_deposit", "lend_withdraw", "borrow", "repay", "yield_deposit", "yield_withdraw", "approve", "permit"],
   protocolPermanentApprovals: [],
   protocolAmountThresholds: { "aave-v3": 1000 },
   maxTransactionUsd: 10_000,
   minNetBenefitUsd: 5,
   maxSlippageBps: 30,
+  maxApprovalUsd: 5_000,
+  maxApprovalAmount: 5_000,
+  maxActionsPerCycle: 4,
+  maxDailyActions: 12,
+  maxReasoningSteps: 6,
+  cycleTimeoutMs: 120_000,
+  maxLeverage: 1,
+  maxOpenPositions: 3,
+  maxNftPurchaseUsd: 250,
+  maxVaultDepositUsd: 5_000,
+  collateralHealthThresholdBps: 12_000,
+  requireSimulation: true,
+  liveExecutionEnabled: env.LIVE_EXECUTION_ENABLED,
+  enableSmartAccounts: env.ENABLE_SMART_ACCOUNTS,
+  enableGasSponsorship: env.ENABLE_GAS_SPONSORSHIP,
+  circuitBreakerThreshold: 3,
+  circuitBreakerWindowMinutes: 60,
   dailyMovedLimitUsd: 25_000,
   stopLossBps: null,
   autoApproveTrustedProtocols: false,
@@ -38,6 +59,7 @@ export function buildDefaultStrategyPolicy(walletMode: StrategyMode = StrategyMo
     strategyId: "ephemeral-strategy",
     mode: walletMode,
     riskProfile: defaultStrategyConfig.riskProfile,
+    strategyKey: defaultStrategyConfig.strategyKey,
     rebalanceThresholdBps: defaultStrategyConfig.rebalanceThresholdBps,
     maxRebalanceUsd: defaultStrategyConfig.maxRebalanceUsd,
     maxDailyMovedUsd: defaultStrategyConfig.maxDailyMovedUsd,
@@ -48,11 +70,31 @@ export function buildDefaultStrategyPolicy(walletMode: StrategyMode = StrategyMo
     approvedChains: [...defaultPolicyConfig.approvedChains],
     approvedProtocols: [...defaultPolicyConfig.approvedProtocols],
     approvedAssets: [...defaultPolicyConfig.approvedAssets],
+    approvedContractAddresses: [...defaultPolicyConfig.approvedContractAddresses],
+    approvedMethodSelectors: [...defaultPolicyConfig.approvedMethodSelectors],
+    approvedActionKinds: [...defaultPolicyConfig.approvedActionKinds],
     protocolPermanentApprovals: [...defaultPolicyConfig.protocolPermanentApprovals],
     protocolAmountThresholds: { ...defaultPolicyConfig.protocolAmountThresholds },
     maxTransactionUsd: defaultPolicyConfig.maxTransactionUsd,
     minNetBenefitUsd: defaultPolicyConfig.minNetBenefitUsd,
     maxSlippageBps: defaultPolicyConfig.maxSlippageBps,
+    maxApprovalUsd: defaultPolicyConfig.maxApprovalUsd,
+    maxApprovalAmount: defaultPolicyConfig.maxApprovalAmount,
+    maxActionsPerCycle: defaultPolicyConfig.maxActionsPerCycle,
+    maxDailyActions: defaultPolicyConfig.maxDailyActions,
+    maxReasoningSteps: defaultPolicyConfig.maxReasoningSteps,
+    cycleTimeoutMs: defaultPolicyConfig.cycleTimeoutMs,
+    maxLeverage: defaultPolicyConfig.maxLeverage,
+    maxOpenPositions: defaultPolicyConfig.maxOpenPositions,
+    maxNftPurchaseUsd: defaultPolicyConfig.maxNftPurchaseUsd,
+    maxVaultDepositUsd: defaultPolicyConfig.maxVaultDepositUsd,
+    collateralHealthThresholdBps: defaultPolicyConfig.collateralHealthThresholdBps,
+    requireSimulation: defaultPolicyConfig.requireSimulation,
+    liveExecutionEnabled: defaultPolicyConfig.liveExecutionEnabled,
+    enableSmartAccounts: defaultPolicyConfig.enableSmartAccounts,
+    enableGasSponsorship: defaultPolicyConfig.enableGasSponsorship,
+    circuitBreakerThreshold: defaultPolicyConfig.circuitBreakerThreshold,
+    circuitBreakerWindowMinutes: defaultPolicyConfig.circuitBreakerWindowMinutes,
     dailyMovedLimitUsd: defaultPolicyConfig.dailyMovedLimitUsd,
     stopLossBps: defaultPolicyConfig.stopLossBps,
     autoApproveTrustedProtocols: defaultPolicyConfig.autoApproveTrustedProtocols,
@@ -130,6 +172,7 @@ export function toStrategyPolicy(
     strategyId: strategy.id,
     mode: strategy.mode,
     riskProfile: strategy.riskProfile,
+    strategyKey: strategy.strategyKey,
     rebalanceThresholdBps: strategy.rebalanceThresholdBps,
     maxRebalanceUsd: strategy.maxRebalanceUsd,
     maxDailyMovedUsd: strategy.maxDailyMovedUsd,
@@ -140,11 +183,31 @@ export function toStrategyPolicy(
     approvedChains: parseJsonNumberArray(strategy.policyConfig.approvedChains),
     approvedProtocols: parseJsonArray(strategy.policyConfig.approvedProtocols),
     approvedAssets: parseJsonArray(strategy.policyConfig.approvedAssets),
+    approvedContractAddresses: parseJsonArray(strategy.policyConfig.approvedContractAddresses),
+    approvedMethodSelectors: parseJsonArray(strategy.policyConfig.approvedMethodSelectors),
+    approvedActionKinds: parseJsonArray(strategy.policyConfig.approvedActionKinds),
     protocolPermanentApprovals: parseJsonArray(strategy.policyConfig.protocolPermanentApprovals),
     protocolAmountThresholds: parseJsonRecord(strategy.policyConfig.protocolAmountThresholds),
     maxTransactionUsd: strategy.policyConfig.maxTransactionUsd,
     minNetBenefitUsd: strategy.policyConfig.minNetBenefitUsd,
     maxSlippageBps: strategy.policyConfig.maxSlippageBps,
+    maxApprovalUsd: strategy.policyConfig.maxApprovalUsd,
+    maxApprovalAmount: strategy.policyConfig.maxApprovalAmount,
+    maxActionsPerCycle: strategy.policyConfig.maxActionsPerCycle,
+    maxDailyActions: strategy.policyConfig.maxDailyActions,
+    maxReasoningSteps: strategy.policyConfig.maxReasoningSteps,
+    cycleTimeoutMs: strategy.policyConfig.cycleTimeoutMs,
+    maxLeverage: strategy.policyConfig.maxLeverage,
+    maxOpenPositions: strategy.policyConfig.maxOpenPositions,
+    maxNftPurchaseUsd: strategy.policyConfig.maxNftPurchaseUsd,
+    maxVaultDepositUsd: strategy.policyConfig.maxVaultDepositUsd,
+    collateralHealthThresholdBps: strategy.policyConfig.collateralHealthThresholdBps,
+    requireSimulation: strategy.policyConfig.requireSimulation,
+    liveExecutionEnabled: strategy.policyConfig.liveExecutionEnabled,
+    enableSmartAccounts: strategy.policyConfig.enableSmartAccounts,
+    enableGasSponsorship: strategy.policyConfig.enableGasSponsorship,
+    circuitBreakerThreshold: strategy.policyConfig.circuitBreakerThreshold,
+    circuitBreakerWindowMinutes: strategy.policyConfig.circuitBreakerWindowMinutes,
     dailyMovedLimitUsd: strategy.policyConfig.dailyMovedLimitUsd,
     stopLossBps: strategy.policyConfig.stopLossBps,
     autoApproveTrustedProtocols: strategy.policyConfig.autoApproveTrustedProtocols,
@@ -383,6 +446,7 @@ export async function getDashboardSnapshot(walletAddress?: string): Promise<Dash
 export async function updateStrategySettings(walletAddress: string, input: Partial<{
   mode: StrategyMode;
   riskProfile: RiskProfile;
+  strategyKey: string;
   rebalanceThresholdBps: number;
   maxRebalanceUsd: number;
   maxDailyMovedUsd: number;
@@ -393,10 +457,30 @@ export async function updateStrategySettings(walletAddress: string, input: Parti
   approvedChains: number[];
   approvedProtocols: string[];
   approvedAssets: string[];
+  approvedContractAddresses: string[];
+  approvedMethodSelectors: string[];
+  approvedActionKinds: string[];
   protocolPermanentApprovals: string[];
   protocolAmountThresholds: Record<string, number>;
   maxTransactionUsd: number;
   minNetBenefitUsd: number;
+  maxApprovalUsd: number;
+  maxApprovalAmount: number;
+  maxActionsPerCycle: number;
+  maxDailyActions: number;
+  maxReasoningSteps: number;
+  cycleTimeoutMs: number;
+  maxLeverage: number;
+  maxOpenPositions: number;
+  maxNftPurchaseUsd: number;
+  maxVaultDepositUsd: number;
+  collateralHealthThresholdBps: number;
+  requireSimulation: boolean;
+  liveExecutionEnabled: boolean;
+  enableSmartAccounts: boolean;
+  enableGasSponsorship: boolean;
+  circuitBreakerThreshold: number;
+  circuitBreakerWindowMinutes: number;
   autoApproveTrustedProtocols: boolean;
 }>) {
   const base = await ensureUserStrategy(walletAddress);
@@ -407,6 +491,7 @@ export async function updateStrategySettings(walletAddress: string, input: Parti
   await prisma.strategy.update({
     where: { id: base.strategy.id },
     data: {
+      strategyKey: input.strategyKey,
       mode: input.mode,
       riskProfile: input.riskProfile,
       rebalanceThresholdBps: input.rebalanceThresholdBps,
@@ -421,10 +506,30 @@ export async function updateStrategySettings(walletAddress: string, input: Parti
           approvedChains: input.approvedChains,
           approvedProtocols: input.approvedProtocols,
           approvedAssets: input.approvedAssets,
+          approvedContractAddresses: input.approvedContractAddresses,
+          approvedMethodSelectors: input.approvedMethodSelectors,
+          approvedActionKinds: input.approvedActionKinds,
           protocolPermanentApprovals: input.protocolPermanentApprovals,
           protocolAmountThresholds: input.protocolAmountThresholds,
           maxTransactionUsd: input.maxTransactionUsd,
           minNetBenefitUsd: input.minNetBenefitUsd,
+          maxApprovalUsd: input.maxApprovalUsd,
+          maxApprovalAmount: input.maxApprovalAmount,
+          maxActionsPerCycle: input.maxActionsPerCycle,
+          maxDailyActions: input.maxDailyActions,
+          maxReasoningSteps: input.maxReasoningSteps,
+          cycleTimeoutMs: input.cycleTimeoutMs,
+          maxLeverage: input.maxLeverage,
+          maxOpenPositions: input.maxOpenPositions,
+          maxNftPurchaseUsd: input.maxNftPurchaseUsd,
+          maxVaultDepositUsd: input.maxVaultDepositUsd,
+          collateralHealthThresholdBps: input.collateralHealthThresholdBps,
+          requireSimulation: input.requireSimulation,
+          liveExecutionEnabled: input.liveExecutionEnabled,
+          enableSmartAccounts: input.enableSmartAccounts,
+          enableGasSponsorship: input.enableGasSponsorship,
+          circuitBreakerThreshold: input.circuitBreakerThreshold,
+          circuitBreakerWindowMinutes: input.circuitBreakerWindowMinutes,
           autoApproveTrustedProtocols: input.autoApproveTrustedProtocols,
         },
       },

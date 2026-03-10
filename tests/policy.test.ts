@@ -1,31 +1,14 @@
 import { RiskProfile, StrategyMode } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { evaluatePolicy } from "@/lib/risk/policy-engine";
+import { buildDefaultStrategyPolicy } from "@/server/services/strategy-service";
 import type { RebalanceCandidate, StrategyPolicy } from "@/types/domain";
 
 const basePolicy: StrategyPolicy = {
+  ...buildDefaultStrategyPolicy(),
   strategyId: "strategy-1",
   mode: StrategyMode.HUMAN_APPROVAL,
   riskProfile: RiskProfile.BALANCED,
-  rebalanceThresholdBps: 50,
-  maxRebalanceUsd: 10_000,
-  maxDailyMovedUsd: 25_000,
-  cooldownMinutes: 120,
-  slippageBps: 30,
-  dryRun: false,
-  emergencyPause: false,
-  approvedChains: [42161, 8453, 10],
-  approvedProtocols: ["aave-v3"],
-  approvedAssets: ["USDC", "USDT", "DAI"],
-  protocolPermanentApprovals: [],
-  protocolAmountThresholds: { "aave-v3": 1_000 },
-  maxTransactionUsd: 10_000,
-  minNetBenefitUsd: 5,
-  maxSlippageBps: 30,
-  dailyMovedLimitUsd: 25_000,
-  stopLossBps: null,
-  autoApproveTrustedProtocols: false,
-  allowUnlimitedApprovals: false,
 };
 
 const candidate: RebalanceCandidate = {

@@ -1,8 +1,11 @@
 import { env } from "@/lib/config/env";
 import { prisma } from "@/lib/db/prisma";
 import { runAgentCycle } from "@/server/services/agent-service";
+import { acquireWorkerLease, releaseWorkerLease } from "@/storage/agent-store";
 
 let batchRunning = false;
+const workerOwnerId = `${process.pid}-${Date.now()}`;
+const leaseKey = "agent-loop";
 
 async function runBatch() {
   if (batchRunning) {
@@ -13,6 +16,17 @@ async function runBatch() {
   batchRunning = true;
 
   try {
+    const hasLease = await acquireWorkerLease({
+      key: leaseKey,
+      ownerId: workerOwnerId,
+      ttlSeconds: env.WORKER_LEASE_TTL_SECONDS,
+    });
+
+    if (!hasLease) {
+      console.warn("[worker] Another worker lease is active. Skipping this tick.");
+      return;
+    }
+
     const users = await prisma.user.findMany({
       where: {
         strategies: {
@@ -43,6 +57,7 @@ async function runBatch() {
       }
     }
   } finally {
+    await releaseWorkerLease(leaseKey, workerOwnerId);
     batchRunning = false;
   }
 }

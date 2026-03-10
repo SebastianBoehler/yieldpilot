@@ -30,7 +30,7 @@ export default async function LogsPage({
         <SectionHeading
           eyebrow="Execution log"
           title="Agent audit trail"
-          description="Every loop, policy gate, and execution outcome is appended here so autonomous and manual flows share the same forensic trail."
+          description="Every cycle, action quote, simulation result, sponsorship decision, and execution outcome is appended here so autonomous and approval-based flows share the same forensic trail."
         />
         {logs.length ? (
           <div className="space-y-3">

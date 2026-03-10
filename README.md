@@ -1,202 +1,93 @@
 # YieldPilot
 
-[![CI](https://github.com/SebastianBoehler/yieldpilot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SebastianBoehler/yieldpilot/actions/workflows/ci.yml)
-[![Docker](https://github.com/SebastianBoehler/yieldpilot/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/SebastianBoehler/yieldpilot/actions/workflows/docker.yml)
-![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Google ADK](https://img.shields.io/badge/Google%20ADK-Agent%20Framework-4285F4?logo=google&logoColor=white)
-![LI.FI](https://img.shields.io/badge/LI.FI-Capital%20Movement-111827)
-![Aave](https://img.shields.io/badge/Aave-Live%20RPC%20Markets-B6509E)
-![Data](https://img.shields.io/badge/Data-Live%20RPC%20%26%20Official%20APIs-0F766E)
+YieldPilot is now a production-oriented autonomous onchain agent runtime.
 
-Autonomous cross-chain treasury management for stablecoins.
+The original cross-chain yield optimizer remains live as the first built-in strategy pack. Underneath it, the project now uses a generic cycle runner, protocol adapters, gas-sponsorship-aware execution plumbing, hardcoded risk controls, and Railway/Postgres deployment defaults.
 
-YieldPilot is a production-style MVP for the LI.FI autonomous agent challenge. It continuously scans live lending opportunities across EVM chains, estimates net carry after bridge and execution costs, and either proposes or executes rebalances under explicit user policy.
+## What is live in phase 1
 
-The system uses Google Agent Development Kit as the agent framework, LI.FI as the capital movement layer, and official on-chain/provider data instead of mock snapshots or demo feeds.
+- EVM-first runtime on `Arbitrum`, `Base`, and `Optimism`
+- Generic action loop with persistent cycle, action, protocol, and trace records
+- Yield strategy pack backed by live Aave + LI.FI data
+- DEX / bridge adapter via LI.FI
+- Lending / yield adapter via Aave
+- Human approval mode and autonomous mode on the same runtime
+- Hardcoded limits for action count, notional, slippage, approvals, leverage, and emergency pause
+- Railway-ready web + worker deployment posture
 
-## Why this repo matters
+## What is scaffolded in phase 1
 
-- Cross-chain stablecoin treasury automation with a real execution loop
-- Google ADK agent orchestration with explicit strategy, risk, execution, and portfolio roles
-- LI.FI integrated into the actual rebalance path, not as a standalone demo call
-- Human approval and autonomous execution modes sharing the same transaction planner
-- Live Aave V3 RPC reads for opportunities and positions
-- Full audit trail for approvals, decisions, transactions, and agent runs
-- Vercel-friendly preview flow for live portfolio and route inspection
+- ERC-4337 smart-account provider interface
+- Pimlico-compatible gas sponsor interface
+- EIP-7702 delegated execution interface
+- Perps adapter
+- NFT adapter
+- Vault / staking adapter beyond Aave
 
-## Current deployment posture
+These scaffolded paths fail closed with explicit unsupported results and logs. They do not silently fall through.
 
-YieldPilot is now shaped for a Vercel preview deployment where you can:
+## Architecture
 
-- connect an EVM wallet such as Phantom EVM, MetaMask-compatible injected wallets, or WalletConnect
-- connect Phantom Solana for Solana wallet visibility
-- inspect live stablecoin balances and Aave positions across supported chains
-- inspect discovered yield sources from live RPC reads
-- generate a live rebalance plan
-- execute the full wallet-side sequence, including the destination deposit step
+`scheduler -> cycle runner -> strategy module -> protocol adapter -> wallet provider -> gas sponsor -> persistence/logging`
 
-What is intentionally not enabled yet:
+Key modules:
 
-- scheduled automation via cron
-- production-grade persistent infrastructure defaults
+- `src/agent/`: generic cycle runner, strategy modules, shared runtime types
+- `src/protocols/`: protocol adapter registry and adapters
+- `src/execution/`: execution facade
+- `src/wallet/`: EOA, smart-account, and delegated execution providers
+- `src/gas/`: sponsor provider abstraction
+- `src/risk/`: hardcoded risk engine
+- `src/storage/`: cycle/action persistence helpers
 
-The preview deployment path is centered on live read plus direct browser-wallet execution. The persisted approval and log model still exists, but for durable multi-user persistence you should move the deployment to a managed Postgres database.
+## Current strategy pack
 
-## Core stack
+### `yield-agent`
 
-- Google ADK
-- Next.js 16 App Router
-- TypeScript
-- Tailwind CSS 4
-- Prisma + SQLite
-- viem
-- LI.FI SDK
-- Aave V3 official contracts and address book
-- Vitest
-- Docker
+The preserved yield feature now runs as a strategy module:
 
-## Live data sources
+1. discover positions and yield opportunities
+2. select the best rebalance candidate
+3. normalize the plan into generic actions
+4. quote, validate, simulate, and optionally execute those actions
 
-YieldPilot does not use demo yield data.
+## Environment
 
-- Opportunity discovery: Aave V3 reserve data via official contracts over RPC
-- Position discovery: Aave V3 user reserve data via official contracts over RPC
-- Capital movement pricing: LI.FI SDK route discovery
-- Chain execution: viem against configured RPC endpoints
+Copy `.env.example` to `.env`.
 
-Current live scope:
+Required baseline:
 
-- Aave V3 on Arbitrum
-- Aave V3 on Base
-- Aave V3 on Optimism
-- Stablecoin-focused assets: `USDC`, `USDT`, `DAI`
-
-Base is currently `USDC`-first because that is the cleanest reliable Aave stablecoin surface in this MVP.
-
-## Product architecture
-
-### Agent system
-
-- `Portfolio Analyst`: inspects current exposure, concentration, and monitoring priorities
-- `Market Analyst`: inspects live yield markets and route economics
-- `Strategy Agent`: evaluates live opportunities and produces the rebalance thesis
-- `Risk Agent`: validates chains, protocols, assets, caps, cooldowns, and benefit thresholds
-- `Execution Agent`: prepares allowance, bridge, swap, withdrawal, and deposit steps
-- `Portfolio Agent`: summarizes allocation state, effective APY, and run outcomes
-
-The deterministic planner computes candidates and execution plans. Google ADK then runs a documented workflow shape:
-
-- `ParallelAgent`: portfolio and market analysis run in parallel over shared session state
-- `SequentialAgent`: strategy, risk, execution, and portfolio handoff run in order with `outputKey`-based state passing
-
-This keeps the ADK layer closer to the official workflow patterns instead of treating ADK like a single prompt wrapper.
-
-### Execution loop
-
-Every cycle:
-
-1. Fetches current positions
-2. Scans live Aave opportunities
-3. Prices LI.FI routes
-4. Scores alternatives after bridge, gas, slippage, and risk penalties
-5. Validates policy
-6. Queues approval or executes
-7. Records the outcome
-
-### Execution modes
-
-#### Human approval
-
-- Scans and scores opportunities
-- Builds the exact transaction sequence
-- Queues approvals before any allowance change, swap, bridge, withdrawal, or deposit
-- Exposes per-step transaction data in the approval queue
-- Also supports direct browser-wallet execution of a live plan from the opportunities page
-
-#### Autonomous
-
-- Uses a backend wallet only when `AGENT_PRIVATE_KEY` is configured
-- Enforces allowlists, limits, cooldowns, and minimum benefit thresholds
-- Writes the same decision and transaction audit trail as human mode
-
-## Pages shipped
-
-- Landing page
-- Dashboard
-- Opportunities
-- Strategy settings
-- Approval queue
-- Execution logs
-
-## Repo structure
-
-```txt
-src/
-  app/
-    (marketing)/
-    dashboard/
-    opportunities/
-    settings/
-    approvals/
-    logs/
-    api/
-  components/
-    approvals/
-    charts/
-    dashboard/
-    layout/
-    settings/
-    ui/
-  lib/
-    adk/
-    config/
-    db/
-    lifi/
-    orchestration/
-    portfolio/
-    protocols/
-    risk/
-    scoring/
-    utils/
-    wallet/
-  server/
-    services/
-  types/
-prisma/
-scripts/
-tests/
-```
-
-## Local setup
-
-Copy `.env.example` to `.env` and set the values you need:
-
-```bash
-cp .env.example .env
-```
-
-Important variables:
-
-- `DATABASE_URL`: Prisma connection string. Local default is SQLite
+- `DATABASE_URL`
 - `ARBITRUM_RPC_URL`
 - `BASE_RPC_URL`
 - `OPTIMISM_RPC_URL`
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: optional, enables WalletConnect in the browser
-- `NEXT_PUBLIC_ARBITRUM_RPC_URL`
-- `NEXT_PUBLIC_BASE_RPC_URL`
-- `NEXT_PUBLIC_OPTIMISM_RPC_URL`
-- `NEXT_PUBLIC_SOLANA_RPC_URL`: optional if you extend the Solana branch beyond the current official portfolio API path
-- `LIFI_INTEGRATOR`
-- `NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS`: wallet to inspect and operate against in local MVP mode
-- `GOOGLE_API_KEY`: enables live Google ADK reviews
-- `GOOGLE_GENAI_MODEL`: defaults to `gemini-2.5-flash`
-- `AGENT_PRIVATE_KEY`: required only for autonomous execution mode
-- `AGENT_LOOP_INTERVAL_MINUTES`: worker schedule
+- `NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS`
 
-If `GOOGLE_API_KEY` is not set, the deterministic planner still runs and the ADK layer falls back to structured local summaries so the app remains runnable.
+Optional but recommended:
 
-Install dependencies and bootstrap the database:
+- `GOOGLE_API_KEY`
+- `GOOGLE_GENAI_MODEL`
+- `AGENT_PRIVATE_KEY`
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+- `LIVE_EXECUTION_ENABLED`
+- `ENABLE_SMART_ACCOUNTS`
+- `ENABLE_GAS_SPONSORSHIP`
+- `ERC4337_BUNDLER_RPC_URL`
+- `ERC4337_PAYMASTER_RPC_URL`
+- `SMART_ACCOUNT_FACTORY_ADDRESS`
+- `AGENT_HEALTHCHECK_TOKEN`
+
+Important: gas sponsorship only covers gas where the selected wallet path and protocol adapter support it. It does not cover swap fees, bridge fees, collateral, borrow exposure, asset cost, NFT purchase price, slippage, or marketplace fees.
+
+## Local development
+
+Start Postgres:
+
+```bash
+docker compose up postgres -d
+```
+
+Install and prepare Prisma:
 
 ```bash
 bun install
@@ -204,100 +95,105 @@ bun run db:generate
 bun run db:push
 ```
 
-Start the app:
+Run the app:
 
 ```bash
 bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
-
-Start the recurring agent worker in a second terminal:
+Run the worker:
 
 ```bash
 bun run worker
 ```
 
-## Vercel preview
-
-Recommended env vars for a preview deployment:
-
-- `DATABASE_URL=file:/tmp/yieldpilot.db`
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` if you want WalletConnect support
-- `GOOGLE_API_KEY` if you want ADK review summaries to use Gemini instead of the deterministic fallback
-
-The preview flow is meant for:
-
-- viewing live opportunities and sources
-- viewing supported cross-chain wallet balances
-- viewing Solana wallet assets through official Jupiter portfolio APIs
-- generating a live plan
-- executing that plan from a connected EVM wallet
-
-Vercel will detect `bun.lock` and the `packageManager` field in `package.json`, so installs and builds run through Bun instead of npm.
-
-## Quality checks
+Run checks:
 
 ```bash
 bun run lint
 bun run test
-bun run db:push
 bun run build
 ```
 
-## GitHub workflows
+## Railway deployment
 
-- `ci.yml`: installs dependencies and runs lint, tests, and production build on pushes and pull requests
-- `docker.yml`: verifies the Docker image builds successfully on pushes and pull requests
+Recommended services:
 
-## Docker
+- `yieldpilot-web`
+- `yieldpilot-worker`
+- `Postgres`
 
-Build and run the web app plus the worker:
+### Web service
+
+- Use the repo `Dockerfile`
+- Start command: `bun run db:push && bun run start:web`
+- Health check path: `/api/health`
+
+### Worker service
+
+- Use the same repo `Dockerfile`
+- Start command: `bun run db:push && bun run worker`
+
+Recommended Railway variables:
+
+- `DATABASE_URL` from Railway Postgres
+- `NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS`
+- `ARBITRUM_RPC_URL`
+- `BASE_RPC_URL`
+- `OPTIMISM_RPC_URL`
+- `GOOGLE_API_KEY` if you want ADK summaries
+- `AGENT_PRIVATE_KEY` for backend autonomous execution
+- `LIVE_EXECUTION_ENABLED=false` by default
+- `ENABLE_SMART_ACCOUNTS=false` by default
+- `ENABLE_GAS_SPONSORSHIP=false` by default
+
+Turn `LIVE_EXECUTION_ENABLED` on only after confirming RPC, wallet, limits, and protocol support.
+
+## Health endpoints
+
+- `GET /api/health`
+- `GET /api/ready`
+
+If `AGENT_HEALTHCHECK_TOKEN` is set, pass it as `?token=...` to `/api/health`.
+
+## Example triggers
+
+### Gas-aware yield / Aave cycle
 
 ```bash
-docker compose up --build
+curl -X POST http://localhost:3000/api/agent/run \
+  -H "Content-Type: application/json" \
+  -d '{"walletAddress":"0xYOUR_WALLET"}'
 ```
 
-The compose setup persists the SQLite database in a named Docker volume and starts:
+### Browser-wallet live plan
 
-- `app`: Next.js server on port `3000`
-- `worker`: recurring YieldPilot agent loop
+```bash
+curl -X POST http://localhost:3000/api/agent/plan \
+  -H "Content-Type: application/json" \
+  -d '{"walletAddress":"0xYOUR_WALLET"}'
+```
 
-## Main implementation files
+### Scaffolded examples
 
-- `src/lib/adk/runner.ts`: Google ADK agent orchestration
-- `src/lib/orchestration/rebalance.ts`: live rebalance decision flow
-- `src/lib/protocols/aave-v3.ts`: Aave RPC integration
-- `src/lib/lifi/quotes.ts`: LI.FI routing and cost estimation
-- `src/lib/risk/policy-engine.ts`: policy validation
-- `src/lib/scoring/engine.ts`: opportunity scoring and ranking
-- `src/lib/wallet/signing-service.ts`: approval prep and autonomous signing
-- `src/lib/wallet/wagmi-config.ts`: browser wallet connector configuration
-- `src/lib/wallet/execute-transaction-plan.ts`: sequential wallet-side transaction execution
-- `src/server/services/agent-service.ts`: end-to-end agent run service
-- `src/server/services/live-portfolio-service.ts`: DB-independent live portfolio snapshot
+These are architecture examples in phase 1, not live end-to-end protocol coverage yet:
 
-## Policy controls
+- gasless swap: LI.FI adapter + sponsorship-aware execution facade
+- gasless perp open: perps adapter returns structured unsupported result
+- gasless NFT mint or buy: NFT adapter returns structured unsupported result
+- gasless vault deposit: vault adapter returns structured unsupported result unless mapped to Aave lending/yield actions
 
-- chain allowlist
-- protocol allowlist
-- asset allowlist
-- max rebalance amount
-- max per-transaction amount
-- minimum projected net benefit
-- maximum strategy slippage
-- cooldown window
-- emergency pause
-- trusted protocol thresholds for auto-approval behavior
+## Known limitations
 
-Approvals are never hidden. In human mode, allowance transactions are surfaced explicitly as their own transaction steps.
+- ERC-4337 provider plumbing is in place, but the local phase-1 wallet provider still falls back to EOA execution unless the smart-account route is fully supported
+- EIP-7702 is interface-only in phase 1
+- Perps, NFTs, and non-Aave vault/staking flows are scaffolded, not live
+- Solana remains portfolio-visibility-first; the main execution runtime is EVM-first
 
-## Current MVP limits
+## Highest leverage next steps
 
-- Opportunity coverage is intentionally narrow and stablecoin-focused
-- Phantom Solana wallet visibility is supported, but Solana-native execution is not wired yet
-- Autonomous execution assumes an EVM-compatible browser wallet or a backend execution key
-- Base support is narrower than Arbitrum and Optimism because the live opportunity set is constrained to reliable Aave markets
-- The first protocol abstraction is Aave-centric; Morpho and Spark are the next natural extensions
-
-This is the right tradeoff for a serious MVP: live data, explicit controls, narrow protocol scope, and an agent loop that can actually run locally.
+- enable a real ERC-4337 submission path for single-step Aave and LI.FI bundles
+- add protocol-specific perps support behind a dedicated adapter
+- add one live NFT adapter with strict marketplace and price allowlists
+- move approval and cycle views to dedicated action-level dashboards
+- replace the simple worker lease with stronger transactional locking if multi-worker scale becomes necessary

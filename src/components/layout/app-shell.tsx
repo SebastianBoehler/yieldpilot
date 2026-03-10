@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Activity, BadgeCheck, LayoutDashboard, ListChecks, Logs, Sparkles, Wallet } from "lucide-react";
+import { Activity, BadgeCheck, Layers3, LayoutDashboard, ListChecks, Logs, Sparkles, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/indexes", label: "Indexes", icon: Layers3 },
   { href: "/opportunities", label: "Opportunities", icon: Sparkles },
   { href: "/approvals", label: "Approvals", icon: BadgeCheck },
   { href: "/logs", label: "Execution Log", icon: Logs },
@@ -35,7 +36,7 @@ export function AppShell({
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-slate-400">YieldPilot</p>
-              <h1 className="text-xl font-semibold tracking-tight">Autonomous Treasury</h1>
+              <h1 className="text-xl font-semibold tracking-tight">Autonomous Onchain Agent</h1>
             </div>
           </div>
           <nav className="mt-10 space-y-2">
@@ -65,7 +66,7 @@ export function AppShell({
               Loop monitoring is enabled
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              YieldPilot continuously scans stablecoin yield across supported Aave markets and routes capital through LI.FI when the net benefit clears policy.
+              YieldPilot now runs as a production-oriented onchain agent runtime. Yield optimization remains the first live strategy pack, with gasless-compatible execution plumbing and protocol adapters behind the same loop.
             </p>
           </div>
         </aside>

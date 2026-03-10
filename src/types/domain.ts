@@ -3,6 +3,7 @@ import type { ApprovalStatus, DecisionStatus, RiskProfile, RunStatus, StrategyMo
 export type SupportedProtocolKey = "aave-v3";
 export type SupportedAssetKey = "USDC" | "USDT" | "DAI";
 export type SupportedChainKey = "arbitrum" | "base" | "optimism";
+export type ConnectedWalletType = "evm" | "solana";
 
 export type ChainConfig = {
   id: number;
@@ -189,11 +190,12 @@ export type AgentCycleResult = {
 
 export type DashboardSnapshot = {
   walletAddress?: string;
+  walletType?: ConnectedWalletType;
   totalPortfolioUsd: number;
   effectiveApy: number;
   pendingApprovals: number;
   autonomousModeEnabled: boolean;
-  positions: PortfolioPosition[];
+  positions: DashboardPosition[];
   opportunityCount: number;
   currentAllocation: Array<{
     label: string;
@@ -218,6 +220,21 @@ export type DashboardSnapshot = {
     scheduleLabel: string;
   };
   bestOpportunity?: YieldOpportunity;
+};
+
+export type DashboardPosition = {
+  id: string;
+  walletAddress: string;
+  chainKey: string;
+  chainLabel: string;
+  protocolLabel: string;
+  assetSymbol: string;
+  assetAddress: string;
+  balanceFormatted: number;
+  balanceUsd: number;
+  apy: number;
+  positionType: string;
+  metadata: Record<string, unknown>;
 };
 
 export type ApprovalQueueItem = {

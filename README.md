@@ -30,6 +30,7 @@ The system uses Google Agent Development Kit as the agent framework, LI.FI as th
 YieldPilot is now shaped for a Vercel preview deployment where you can:
 
 - connect an EVM wallet such as Phantom EVM, MetaMask-compatible injected wallets, or WalletConnect
+- connect Phantom Solana for Solana wallet visibility
 - inspect live stablecoin balances and Aave positions across supported chains
 - inspect discovered yield sources from live RPC reads
 - generate a live rebalance plan
@@ -178,6 +179,7 @@ Important variables:
 - `NEXT_PUBLIC_ARBITRUM_RPC_URL`
 - `NEXT_PUBLIC_BASE_RPC_URL`
 - `NEXT_PUBLIC_OPTIMISM_RPC_URL`
+- `NEXT_PUBLIC_SOLANA_RPC_URL`: optional if you extend the Solana branch beyond the current official portfolio API path
 - `LIFI_INTEGRATOR`
 - `NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS`: wallet to inspect and operate against in local MVP mode
 - `GOOGLE_API_KEY`: enables live Google ADK reviews
@@ -221,6 +223,7 @@ The preview flow is meant for:
 
 - viewing live opportunities and sources
 - viewing supported cross-chain wallet balances
+- viewing Solana wallet assets through official Jupiter portfolio APIs
 - generating a live plan
 - executing that plan from a connected EVM wallet
 
@@ -283,7 +286,7 @@ Approvals are never hidden. In human mode, allowance transactions are surfaced e
 ## Current MVP limits
 
 - Opportunity coverage is intentionally narrow and stablecoin-focused
-- Browser wallet support is EVM-only today; Phantom Solana is not integrated yet
+- Phantom Solana wallet visibility is supported, but Solana-native execution is not wired yet
 - Autonomous execution assumes an EVM-compatible browser wallet or a backend execution key
 - Base support is narrower than Arbitrum and Optimism because the live opportunity set is constrained to reliable Aave markets
 - The first protocol abstraction is Aave-centric; Morpho and Spark are the next natural extensions

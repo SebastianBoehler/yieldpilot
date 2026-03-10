@@ -1,11 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { formatPercent, formatUsd } from "@/lib/utils/format";
-import type { PortfolioPosition } from "@/types/domain";
+import type { DashboardPosition } from "@/types/domain";
 
 export function PositionsTable({
   positions,
 }: {
-  positions: PortfolioPosition[];
+  positions: DashboardPosition[];
 }) {
   return (
     <div className="overflow-hidden rounded-[24px] border border-slate-200">

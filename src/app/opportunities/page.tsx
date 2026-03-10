@@ -9,6 +9,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { formatPercent, formatUsd } from "@/lib/utils/format";
 import { selectBestCandidate } from "@/lib/orchestration/rebalance";
 import { buildDefaultStrategyPolicy } from "@/server/services/strategy-service";
+import type { ConnectedWalletType } from "@/types/domain";
 
 export default async function OpportunitiesPage({
   searchParams,
@@ -17,11 +18,29 @@ export default async function OpportunitiesPage({
 }) {
   const params = await searchParams;
   const wallet = typeof params.wallet === "string" ? params.wallet : undefined;
+  const walletType = params.walletType === "solana" ? "solana" : "evm";
 
   if (!wallet) {
     return (
-      <AppShell currentPath="/opportunities" walletBar={<WalletBar />}>
+      <AppShell currentPath="/opportunities" walletBar={<WalletBar walletType={walletType as ConnectedWalletType} />}>
         <EmptyState title="Connect a wallet first" description="YieldPilot only surfaces live opportunities after it can price your current positions." />
+      </AppShell>
+    );
+  }
+
+  if (walletType === "solana") {
+    return (
+      <AppShell currentPath="/opportunities" walletBar={<WalletBar walletAddress={wallet} walletType="solana" />}>
+        <Panel className="space-y-6">
+          <SectionHeading
+            eyebrow="Solana wallet support"
+            title="Portfolio visibility is live"
+            description="Phantom Solana wallet support is active for asset visibility on the dashboard. The current rebalance and yield execution adapters still target the supported EVM Aave plus LI.FI flow."
+          />
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-6 text-sm leading-7 text-slate-600">
+            Connect a Solana wallet to inspect assets. To route capital and deposit into yield contracts today, switch to the EVM wallet mode. Solana-native yield adapters and transaction flows are the next layer.
+          </div>
+        </Panel>
       </AppShell>
     );
   }
@@ -32,7 +51,7 @@ export default async function OpportunitiesPage({
   });
 
   return (
-    <AppShell currentPath="/opportunities" walletBar={<WalletBar walletAddress={wallet} />}>
+    <AppShell currentPath="/opportunities" walletBar={<WalletBar walletAddress={wallet} walletType="evm" />}>
       <div className="space-y-6">
         <LiveRebalanceCard walletAddress={wallet} />
         <Panel className="space-y-6">

@@ -12,10 +12,20 @@ export default async function LogsPage({
 }) {
   const params = await searchParams;
   const wallet = typeof params.wallet === "string" ? params.wallet : undefined;
+  const walletType = params.walletType === "solana" ? "solana" : "evm";
+
+  if (walletType === "solana") {
+    return (
+      <AppShell currentPath="/logs" walletBar={<WalletBar walletAddress={wallet} walletType="solana" />}>
+        <EmptyState title="No Solana execution log yet" description="The persistent execution audit trail is currently tied to the EVM planner and approval model." />
+      </AppShell>
+    );
+  }
+
   const logs = await getExecutionLogs(wallet);
 
   return (
-    <AppShell currentPath="/logs" walletBar={<WalletBar walletAddress={wallet} />}>
+    <AppShell currentPath="/logs" walletBar={<WalletBar walletAddress={wallet} walletType="evm" />}>
       <Panel className="space-y-6">
         <SectionHeading
           eyebrow="Execution log"

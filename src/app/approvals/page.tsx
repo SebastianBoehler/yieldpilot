@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { formatPercent, formatUsd } from "@/lib/utils/format";
 import { getApprovalQueue } from "@/server/services/approval-service";
+import type { ConnectedWalletType } from "@/types/domain";
 
 export default async function ApprovalsPage({
   searchParams,
@@ -15,10 +16,20 @@ export default async function ApprovalsPage({
 }) {
   const params = await searchParams;
   const wallet = typeof params.wallet === "string" ? params.wallet : undefined;
+  const walletType = params.walletType === "solana" ? "solana" : "evm";
+
+  if (walletType === "solana") {
+    return (
+      <AppShell currentPath="/approvals" walletBar={<WalletBar walletAddress={wallet} walletType="solana" />}>
+        <EmptyState title="Solana approvals are not wired yet" description="The current approval queue and execution planner are still EVM-only. Solana wallet support currently focuses on asset visibility." />
+      </AppShell>
+    );
+  }
+
   const approvals = await getApprovalQueue(wallet);
 
   return (
-    <AppShell currentPath="/approvals" walletBar={<WalletBar walletAddress={wallet} />}>
+    <AppShell currentPath="/approvals" walletBar={<WalletBar walletAddress={wallet} walletType={walletType as ConnectedWalletType} />}>
       <Panel className="space-y-6">
         <SectionHeading
           eyebrow="Human-in-the-loop"

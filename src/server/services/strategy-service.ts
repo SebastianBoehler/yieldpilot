@@ -257,6 +257,7 @@ export async function getDashboardSnapshot(walletAddress?: string): Promise<Dash
       effectiveApy: 0,
       pendingApprovals: 0,
       autonomousModeEnabled: false,
+      walletType: "evm",
       positions: [],
       opportunityCount: 0,
       currentAllocation: [],
@@ -311,6 +312,7 @@ export async function getDashboardSnapshot(walletAddress?: string): Promise<Dash
 
   return {
     walletAddress: base.user.walletAddress,
+    walletType: "evm",
     totalPortfolioUsd,
     effectiveApy,
     pendingApprovals: approvals,

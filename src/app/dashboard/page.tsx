@@ -10,6 +10,7 @@ import { Panel } from "@/components/ui/panel";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { formatPercent, formatUsd } from "@/lib/utils/format";
 import { getLiveDashboardSnapshot } from "@/server/services/live-portfolio-service";
+import type { ConnectedWalletType } from "@/types/domain";
 
 export default async function DashboardPage({
   searchParams,
@@ -18,10 +19,14 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const wallet = typeof params.wallet === "string" ? params.wallet : undefined;
-  const snapshot = await getLiveDashboardSnapshot(wallet);
+  const walletType = params.walletType === "solana" ? "solana" : "evm";
+  const snapshot = await getLiveDashboardSnapshot({
+    walletAddress: wallet,
+    walletType,
+  });
 
   return (
-    <AppShell currentPath="/dashboard" walletBar={<WalletBar walletAddress={snapshot.walletAddress} />}>
+    <AppShell currentPath="/dashboard" walletBar={<WalletBar walletAddress={snapshot.walletAddress} walletType={snapshot.walletType as ConnectedWalletType | undefined} />}>
       <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
         <Panel className="space-y-6">
           <SectionHeading
@@ -36,7 +41,7 @@ export default async function DashboardPage({
             <MetricCard
               label="Autonomous mode"
               value={snapshot.autonomousModeEnabled ? "On" : "Off"}
-              detail={snapshot.loopStatus.scheduleLabel}
+              detail={snapshot.walletType === "solana" ? "EVM execution only for now" : snapshot.loopStatus.scheduleLabel}
             />
           </div>
           {snapshot.currentAllocation.length ? (
@@ -47,7 +52,7 @@ export default async function DashboardPage({
           ) : (
             <EmptyState
               title="No live positions yet"
-              description="Connect a wallet or configure a default wallet address to let YieldPilot fetch live stablecoin balances and Aave positions."
+              description="Connect an EVM or Phantom Solana wallet to let YieldPilot fetch live wallet balances and supported yield positions."
             />
           )}
         </Panel>
@@ -58,10 +63,12 @@ export default async function DashboardPage({
               {snapshot.autonomousModeEnabled ? "Autonomous" : "Human approval"}
             </Badge>
             <p className="text-sm leading-6 text-slate-600">
-              The agent loop can be run on demand from the UI. In a Vercel preview, this is the fastest way to inspect the live Aave opportunity set and the current stablecoin exposure across supported chains.
+              {snapshot.walletType === "solana"
+                ? "Solana wallet support currently focuses on portfolio visibility through Jupiter's official portfolio APIs. Automated yield execution still targets the supported EVM routes."
+                : "The agent loop can be run on demand from the UI. In a Vercel preview, this is the fastest way to inspect the live Aave opportunity set and the current stablecoin exposure across supported chains."}
             </p>
           </div>
-          <RunAgentButton walletAddress={snapshot.walletAddress} />
+          <RunAgentButton walletAddress={snapshot.walletAddress} walletType={snapshot.walletType as ConnectedWalletType | undefined} />
           <div className="rounded-[24px] bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-900">Last decision</p>
             <p className="mt-2 text-sm text-slate-600">{snapshot.lastDecision?.summary ?? "No decisions recorded yet."}</p>
@@ -71,7 +78,9 @@ export default async function DashboardPage({
             <p className="mt-2 text-sm text-slate-600">
               {snapshot.bestOpportunity
                 ? `${snapshot.bestOpportunity.chainLabel} ${snapshot.bestOpportunity.assetSymbol} at ${formatPercent(snapshot.bestOpportunity.apy)}`
-                : "Run the live scanner to populate opportunities."}
+                : snapshot.walletType === "solana"
+                  ? "Solana wallet visibility is live. Solana-native yield sourcing is the next adapter."
+                  : "Run the live scanner to populate opportunities."}
             </p>
           </div>
         </Panel>

@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { WagmiProvider } from "wagmi";
+import { SolanaWalletProvider } from "@/components/providers/solana-wallet-provider";
 import { walletConfig } from "@/lib/wallet/wagmi-config";
 
 export function WalletProviders({
@@ -14,7 +15,9 @@ export function WalletProviders({
 
   return (
     <WagmiProvider config={walletConfig}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <SolanaWalletProvider>{children}</SolanaWalletProvider>
+      </QueryClientProvider>
     </WagmiProvider>
   );
 }

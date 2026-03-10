@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { Activity, BadgeCheck, LayoutDashboard, ListChecks, Logs, Sparkles, Wallet } from "lucide-react";
-import { cn } from "@/lib/utils/cn";
+import { ShellNavLink } from "@/components/layout/shell-nav-link";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,20 +33,15 @@ export function AppShell({
           </div>
           <nav className="mt-10 space-y-2">
             {navigation.map((item) => {
-              const Icon = item.icon;
               const active = currentPath.startsWith(item.href);
               return (
-                <Link
+                <ShellNavLink
                   key={item.href}
                   href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition",
-                    active ? "bg-white text-slate-950" : "text-slate-300 hover:bg-slate-900 hover:text-white",
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </Link>
+                  label={item.label}
+                  icon={item.icon}
+                  active={active}
+                />
               );
             })}
           </nav>

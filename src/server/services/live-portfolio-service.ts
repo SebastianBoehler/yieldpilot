@@ -1,13 +1,20 @@
 import { getAaveStableOpportunities, getAaveStablePositions } from "@/lib/protocols/aave-v3";
 import { scheduleLabel } from "@/lib/utils/time";
-import type { DashboardSnapshot } from "@/types/domain";
+import type { ConnectedWalletType, DashboardSnapshot } from "@/types/domain";
 import { env } from "@/lib/config/env";
 import { getDashboardSnapshot } from "@/server/services/strategy-service";
+import { getLiveSolanaDashboardSnapshot } from "@/server/services/solana-portfolio-service";
 
-export async function getLiveDashboardSnapshot(walletAddress?: string): Promise<DashboardSnapshot> {
+export async function getLiveDashboardSnapshot(params: {
+  walletAddress?: string;
+  walletType?: ConnectedWalletType;
+}): Promise<DashboardSnapshot> {
+  const { walletAddress, walletType = "evm" } = params;
+
   if (!walletAddress) {
     return {
       walletAddress: undefined,
+      walletType,
       totalPortfolioUsd: 0,
       effectiveApy: 0,
       pendingApprovals: 0,
@@ -20,6 +27,10 @@ export async function getLiveDashboardSnapshot(walletAddress?: string): Promise<
         scheduleLabel: scheduleLabel(env.AGENT_LOOP_INTERVAL_MINUTES),
       },
     };
+  }
+
+  if (walletType === "solana") {
+    return getLiveSolanaDashboardSnapshot(walletAddress);
   }
 
   const [positions, opportunities, persisted] = await Promise.all([
@@ -41,11 +52,25 @@ export async function getLiveDashboardSnapshot(walletAddress?: string): Promise<
 
   return {
     walletAddress,
+    walletType: "evm",
     totalPortfolioUsd,
     effectiveApy,
     pendingApprovals: persisted?.pendingApprovals ?? 0,
     autonomousModeEnabled: persisted?.autonomousModeEnabled ?? false,
-    positions,
+    positions: positions.map((position) => ({
+      id: position.id,
+      walletAddress: position.walletAddress,
+      chainKey: position.chainKey,
+      chainLabel: position.chainLabel,
+      protocolLabel: position.protocolLabel,
+      assetSymbol: position.assetSymbol,
+      assetAddress: position.assetAddress,
+      balanceFormatted: position.balanceFormatted,
+      balanceUsd: position.balanceUsd,
+      apy: position.apy,
+      positionType: position.positionType,
+      metadata: position.metadata,
+    })),
     opportunityCount: opportunities.length,
     currentAllocation: positions.map((position) => ({
       label: `${position.assetSymbol} · ${position.protocolLabel}`,

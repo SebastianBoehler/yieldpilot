@@ -12,7 +12,7 @@ const envSchema = z.object({
   ARBITRUM_RPC_URL: z.string().url().default("https://arb1.arbitrum.io/rpc"),
   BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
   OPTIMISM_RPC_URL: z.string().url().default("https://mainnet.optimism.io"),
-  AGENT_LOOP_INTERVAL_MINUTES: z.coerce.number().int().positive().default(15),
+  AGENT_LOOP_INTERVAL_MINUTES: z.coerce.number().int().positive().default(30),
   AGENT_HEALTHCHECK_TOKEN: z.string().optional(),
   WORKER_LEASE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
   LIVE_EXECUTION_ENABLED: z.coerce.boolean().default(false),

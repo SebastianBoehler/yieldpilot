@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Activity, BadgeCheck, Layers3, LayoutDashboard, ListChecks, Logs, Sparkles, Wallet } from "lucide-react";
+import { Activity, BadgeCheck, Layers3, LayoutDashboard, ListChecks, Logs, Radar, Sparkles, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/arena", label: "Arena", icon: Radar },
   { href: "/indexes", label: "Indexes", icon: Layers3 },
   { href: "/opportunities", label: "Opportunities", icon: Sparkles },
   { href: "/approvals", label: "Approvals", icon: BadgeCheck },

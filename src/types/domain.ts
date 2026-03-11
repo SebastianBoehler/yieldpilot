@@ -203,6 +203,7 @@ export type AgentCycleResult = {
   decisionStatus: DecisionStatus;
   positions: PortfolioPosition[];
   opportunities: YieldOpportunity[];
+  marketBrief?: MarketIntelligenceBrief;
   candidate?: RebalanceCandidate;
   policyResult?: PolicyResult;
   executionPlan?: ExecutionPlan;
@@ -258,6 +259,82 @@ export type DashboardPosition = {
   apy: number;
   positionType: string;
   metadata: Record<string, unknown>;
+};
+
+export type ArenaAgentSnapshot = {
+  strategyId: string;
+  strategyName: string;
+  walletAddress: string;
+  mode: StrategyMode;
+  riskProfile: RiskProfile;
+  totalPortfolioUsd: number;
+  effectiveApy: number;
+  pendingApprovals: number;
+  recentActionCount: number;
+  updatedAt: string;
+  lastDecision?: {
+    status: DecisionStatus;
+    summary: string;
+    createdAt: string;
+  };
+  latestRun?: {
+    status: RunStatus;
+    summary?: string | null;
+    startedAt: string;
+    completedAt?: string | null;
+  };
+  topAllocations: Array<{
+    label: string;
+    value: number;
+  }>;
+  bestOpportunity?: {
+    assetSymbol: string;
+    chainLabel: string;
+    protocolLabel: string;
+    apy: number;
+  };
+};
+
+export type ArenaMarketPulse = {
+  symbol: string;
+  name: string;
+  priceUsd: number;
+  change24h: number;
+  marketCapUsd?: number;
+  source: string;
+};
+
+export type ArenaNewsItem = {
+  id: string;
+  source: string;
+  title: string;
+  url: string;
+  publishedAt: string;
+  summary?: string;
+};
+
+export type ArenaSnapshot = {
+  generatedAt: string;
+  overview: {
+    totalAgents: number;
+    autonomousAgents: number;
+    pendingApprovals: number;
+    trackedTvlUsd: number;
+    actionsLast24h: number;
+  };
+  agents: ArenaAgentSnapshot[];
+  marketPulse: ArenaMarketPulse[];
+  newsFeed: ArenaNewsItem[];
+};
+
+export type MarketIntelligenceBrief = {
+  generatedAt: string;
+  marketRegime: "risk-on" | "mixed" | "risk-off";
+  recommendedAction: "deploy" | "hold" | "reduce";
+  focusAssets: string[];
+  focusIndexes: string[];
+  summary: string;
+  riskNotes: string[];
 };
 
 export type ApprovalQueueItem = {

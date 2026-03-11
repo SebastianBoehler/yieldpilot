@@ -1,9 +1,12 @@
 import { ApprovalStatus, DecisionStatus, Prisma, RunStatus, TransactionStatus } from "@prisma/client";
 import { runAutonomousAgentCycle } from "@/agent/cycle-runner";
 import { runAdkReview } from "@/lib/adk/runner";
-import type { AgentCycleResult, ExecutionPlan, PolicyResult } from "@/types/domain";
+import { runTradingBrief } from "@/lib/adk/trading-brief";
+import type { AgentCycleResult, ExecutionPlan, MarketIntelligenceBrief, PolicyResult } from "@/types/domain";
 import { prisma } from "@/lib/db/prisma";
+import { getArenaExternalFeeds } from "@/server/services/arena-service";
 import { createApprovalRequest, updateApprovalStatus } from "@/server/services/approval-service";
+import { getDisplayIndexes } from "@/server/services/index-service";
 import { createExecutionLog, ensureUserStrategy, persistOpportunitySnapshots, persistPositions, toStrategyPolicy } from "@/server/services/strategy-service";
 import type { AgentCycleActionResult } from "@/agent/types";
 
@@ -82,6 +85,33 @@ function buildPolicyResult(params: {
   };
 }
 
+async function buildMarketBrief(walletAddress: string): Promise<MarketIntelligenceBrief> {
+  const [indexes, externalFeeds] = await Promise.all([
+    getDisplayIndexes({ walletAddress }),
+    getArenaExternalFeeds(),
+  ]);
+
+  return runTradingBrief({
+    walletAddress,
+    indexes: indexes.map((index) => ({
+      key: index.key,
+      name: index.name,
+      projectedApy: index.projectedApy,
+      description: index.description,
+    })),
+    marketPulse: externalFeeds.marketPulse.map((asset) => ({
+      symbol: asset.symbol,
+      change24h: asset.change24h,
+      priceUsd: asset.priceUsd,
+    })),
+    newsFeed: externalFeeds.newsFeed.map((item) => ({
+      source: item.source,
+      title: item.title,
+      summary: item.summary,
+    })),
+  });
+}
+
 export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleResult> {
   const base = await ensureUserStrategy(walletAddress);
   if (!base) {
@@ -111,6 +141,33 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
   });
 
   try {
+    let marketBrief: MarketIntelligenceBrief | undefined;
+    try {
+      marketBrief = await buildMarketBrief(base.user.walletAddress);
+      await createExecutionLog({
+        userId: base.user.id,
+        strategyId: base.strategy.id,
+        agentRunId: agentRun.id,
+        level: "info",
+        message: "Prepared 30-minute ADK market brief.",
+        context: {
+          marketBrief,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await createExecutionLog({
+        userId: base.user.id,
+        strategyId: base.strategy.id,
+        agentRunId: agentRun.id,
+        level: "warn",
+        message: "Market brief preparation failed; continuing with deterministic execution loop.",
+        context: {
+          error: message,
+        },
+      });
+    }
+
     const cycleResult = await runAutonomousAgentCycle({
       walletAddress: base.user.walletAddress as `0x${string}`,
       userId: base.user.id,
@@ -265,6 +322,7 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
           risk: adkReview.riskOutput,
           execution: adkReview.executionOutput,
           portfolio: adkReview.portfolioOutput,
+          marketBrief,
           cycle: {
             id: cycleResult.cycleId,
             strategyKey: cycleResult.strategyKey,
@@ -281,6 +339,7 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
       decisionStatus,
       positions: cycleResult.positions,
       opportunities: cycleResult.opportunities,
+      marketBrief,
       candidate: cycleResult.candidate,
       policyResult,
       executionPlan,

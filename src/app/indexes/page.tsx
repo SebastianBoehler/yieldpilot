@@ -40,8 +40,8 @@ export default async function IndexesPage({
         <Panel className="space-y-5">
           <SectionHeading
             eyebrow="Index studio"
-            title="Display-only crypto index products"
-            description="These baskets are live site-level index definitions computed from current market data and wallet exposure. They do not trade yet. The goal is to make them ready for later smart-contract basket logic or cron-based agent rebalancing."
+            title="Display-only crypto and onchain index products"
+            description="These baskets combine YieldPilot's live opportunity universe with official free external datasets. They do not trade yet. The goal is to turn the strongest sleeves into later smart-contract or cron-based agent strategies."
           />
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-[24px] bg-slate-50 p-5">
@@ -71,6 +71,11 @@ export default async function IndexesPage({
                   <div>
                     <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{index.name}</h2>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{index.description}</p>
+                    {index.rankingMetricLabel && index.rankingMetricSource ? (
+                      <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">
+                        Ranked by {index.rankingMetricLabel} via {index.rankingMetricSource}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -113,14 +118,24 @@ export default async function IndexesPage({
                 </div>
 
                 <div className="space-y-3">
-                  {index.constituents.map((constituent) => (
-                    <div key={constituent.key} className="rounded-[24px] border border-slate-200 bg-white p-5">
+                  {index.constituents.length ? (
+                    index.constituents.map((constituent) => (
+                      <div key={constituent.key} className="rounded-[24px] border border-slate-200 bg-white p-5">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                           <p className="text-lg font-semibold text-slate-950">{constituent.label}</p>
                           <p className="mt-1 text-sm text-slate-600">
                             Target {constituent.targetWeightPct.toFixed(0)}% · {formatUsd(constituent.targetUsd)}
                           </p>
+                          {constituent.sourceMetricLabel && typeof constituent.sourceMetricValue === "number" ? (
+                            <p className="mt-1 text-sm text-slate-600">
+                              {constituent.sourceMetricLabel}: {" "}
+                              {constituent.sourceMetricUnit === "percent"
+                                ? formatPercent(constituent.sourceMetricValue)
+                                : formatUsd(constituent.sourceMetricValue)}
+                              {constituent.sourceLabel ? ` · ${constituent.sourceLabel}` : ""}
+                            </p>
+                          ) : null}
                         </div>
                         <Badge tone={constituent.bestOpportunity ? "success" : "warning"}>
                           {constituent.bestOpportunity ? "Live venue mapped" : "Venue missing"}
@@ -161,8 +176,14 @@ export default async function IndexesPage({
                           No live venue is currently mapped for this constituent in the supported opportunity universe.
                         </p>
                       )}
-                    </div>
-                  ))}
+                      </div>
+                    ))
+                  ) : (
+                    <EmptyState
+                      title="No live constituent feed yet"
+                      description="This index family is intentionally reserved until YieldPilot is wired to an official free data source for that metric."
+                    />
+                  )}
                 </div>
               </div>
             </Panel>

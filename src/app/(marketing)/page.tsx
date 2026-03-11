@@ -41,10 +41,15 @@ export default function MarketingPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <Link href="/dashboard">
+                <Link href="/arena">
                   <Button className="bg-white text-slate-950 hover:bg-slate-100">
-                    Open dashboard
+                    Open public arena
                     <ArrowRight className="ml-2 size-4" />
+                  </Button>
+                </Link>
+                <Link href="/dashboard">
+                  <Button variant="ghost" className="border border-white/20 text-white hover:bg-white/10">
+                    Open dashboard
                   </Button>
                 </Link>
                 <Link href="/approvals">

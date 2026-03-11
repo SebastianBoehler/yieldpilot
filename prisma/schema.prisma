@@ -72,10 +72,10 @@ enum SponsorshipStatus {
 }
 
 model User {
-  id               String             @id @default(cuid())
-  walletAddress    String             @unique
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id               String            @id @default(cuid())
+  walletAddress    String            @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   strategies       Strategy[]
   approvalRequests ApprovalRequest[]
   executionLogs    ExecutionLog[]
@@ -85,354 +85,469 @@ model User {
 }
 
 model Strategy {
-  id                   String               @id @default(cuid())
-  userId               String
-  name                 String
-  strategyKey          String               @default("yield-agent")
-  mode                 StrategyMode         @default(HUMAN_APPROVAL)
-  riskProfile          RiskProfile          @default(BALANCED)
-  rebalanceThresholdBps Int                 @default(50)
-  maxRebalanceUsd      Float                @default(10000)
-  maxDailyMovedUsd     Float                @default(25000)
-  cooldownMinutes      Int                  @default(120)
-  slippageBps          Int                  @default(30)
-  dryRun               Boolean              @default(false)
-  emergencyPause       Boolean              @default(false)
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  policyConfig         PolicyConfig?
-  positions            Position[]
-  opportunitySnapshots OpportunitySnapshot[]
-  rebalanceDecisions   RebalanceDecision[]
-  approvalRequests     ApprovalRequest[]
-  agentRuns            AgentRun[]
-  agentCycles          AgentCycle[]
-  actionRequests       ActionRequest[]
-  protocolLogs         ProtocolLog[]
-  circuitBreakerState  CircuitBreakerState?
-  capabilitySnapshots  ExecutionCapabilitySnapshot[]
-  workerLeases         WorkerLease[]
+  id                    String                        @id @default(cuid())
+  userId                String
+  name                  String
+  strategyKey           String                        @default("yield-agent")
+  mode                  StrategyMode                  @default(HUMAN_APPROVAL)
+  riskProfile           RiskProfile                   @default(BALANCED)
+  rebalanceThresholdBps Int                           @default(50)
+  maxRebalanceUsd       Float                         @default(10000)
+  maxDailyMovedUsd      Float                         @default(25000)
+  cooldownMinutes       Int                           @default(120)
+  slippageBps           Int                           @default(30)
+  dryRun                Boolean                       @default(false)
+  emergencyPause        Boolean                       @default(false)
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  user                  User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyConfig          PolicyConfig?
+  positions             Position[]
+  opportunitySnapshots  OpportunitySnapshot[]
+  rebalanceDecisions    RebalanceDecision[]
+  approvalRequests      ApprovalRequest[]
+  agentRuns             AgentRun[]
+  agentCycles           AgentCycle[]
+  actionRequests        ActionRequest[]
+  protocolLogs          ProtocolLog[]
+  circuitBreakerState   CircuitBreakerState?
+  capabilitySnapshots   ExecutionCapabilitySnapshot[]
+  workerLeases          WorkerLease[]
 }
 
 model PolicyConfig {
-  id                             String      @id @default(cuid())
-  strategyId                     String      @unique
-  approvedChains                 Json
-  approvedProtocols              Json
-  approvedAssets                 Json
-  approvedContractAddresses      Json        @default("[]")
-  approvedMethodSelectors        Json        @default("[]")
-  approvedActionKinds            Json        @default("[\"swap\",\"bridge_swap\",\"lend_deposit\",\"lend_withdraw\",\"borrow\",\"repay\",\"yield_deposit\",\"yield_withdraw\",\"approve\",\"permit\"]")
-  protocolPermanentApprovals     Json
-  protocolAmountThresholds       Json
-  maxTransactionUsd              Float       @default(10000)
-  minNetBenefitUsd               Float       @default(5)
-  maxSlippageBps                 Int         @default(30)
-  dailyMovedLimitUsd             Float?      @default(25000)
-  stopLossBps                    Int?
-  maxApprovalUsd                 Float       @default(5000)
-  maxApprovalAmount              Float       @default(5000)
-  maxDailyActions                Int         @default(12)
-  maxActionsPerCycle             Int         @default(4)
-  maxReasoningSteps              Int         @default(6)
-  cycleTimeoutMs                 Int         @default(120000)
-  maxLeverage                    Float       @default(1)
-  maxOpenPositions               Int         @default(3)
-  maxNftPurchaseUsd              Float       @default(250)
-  maxVaultDepositUsd             Float       @default(5000)
-  circuitBreakerThreshold        Int         @default(3)
-  circuitBreakerWindowMinutes    Int         @default(60)
-  collateralHealthThresholdBps   Int         @default(12000)
-  requireSimulation              Boolean     @default(true)
-  liveExecutionEnabled           Boolean     @default(false)
-  enableSmartAccounts            Boolean     @default(false)
-  enableGasSponsorship           Boolean     @default(false)
-  autoApproveTrustedProtocols    Boolean     @default(false)
-  allowUnlimitedApprovals        Boolean     @default(false)
-  createdAt                      DateTime    @default(now())
-  updatedAt                      DateTime    @updatedAt
-  strategy                       Strategy    @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  id                           String   @id @default(cuid())
+  strategyId                   String   @unique
+  approvedChains               Json
+  approvedProtocols            Json
+  approvedAssets               Json
+  approvedContractAddresses    Json     @default("[]")
+  approvedMethodSelectors      Json     @default("[]")
+  approvedActionKinds          Json     @default("[\"swap\",\"bridge_swap\",\"lend_deposit\",\"lend_withdraw\",\"borrow\",\"repay\",\"yield_deposit\",\"yield_withdraw\",\"approve\",\"permit\"]")
+  protocolPermanentApprovals   Json
+  protocolAmountThresholds     Json
+  maxTransactionUsd            Float    @default(10000)
+  minNetBenefitUsd             Float    @default(5)
+  maxSlippageBps               Int      @default(30)
+  dailyMovedLimitUsd           Float?   @default(25000)
+  stopLossBps                  Int?
+  maxApprovalUsd               Float    @default(5000)
+  maxApprovalAmount            Float    @default(5000)
+  maxDailyActions              Int      @default(12)
+  maxActionsPerCycle           Int      @default(4)
+  maxReasoningSteps            Int      @default(6)
+  cycleTimeoutMs               Int      @default(120000)
+  maxLeverage                  Float    @default(1)
+  maxOpenPositions             Int      @default(3)
+  maxNftPurchaseUsd            Float    @default(250)
+  maxVaultDepositUsd           Float    @default(5000)
+  circuitBreakerThreshold      Int      @default(3)
+  circuitBreakerWindowMinutes  Int      @default(60)
+  collateralHealthThresholdBps Int      @default(12000)
+  requireSimulation            Boolean  @default(true)
+  liveExecutionEnabled         Boolean  @default(false)
+  enableSmartAccounts          Boolean  @default(false)
+  enableGasSponsorship         Boolean  @default(false)
+  autoApproveTrustedProtocols  Boolean  @default(false)
+  allowUnlimitedApprovals      Boolean  @default(false)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+  strategy                     Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
 }
 
 model Position {
-  id                String      @id @default(cuid())
-  strategyId        String
-  chainId           Int
-  chainKey          String
-  protocol          String
-  assetSymbol       String
-  assetAddress      String
-  balance           String
-  balanceUsd        Float
-  apy               Float
-  positionType      String
-  sourceAddress     String
-  metadata          Json
-  updatedAt         DateTime    @updatedAt
-  strategy          Strategy    @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  strategyId    String
+  chainId       Int
+  chainKey      String
+  protocol      String
+  assetSymbol   String
+  assetAddress  String
+  balance       String
+  balanceUsd    Float
+  apy           Float
+  positionType  String
+  sourceAddress String
+  metadata      Json
+  updatedAt     DateTime @updatedAt
+  strategy      Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
 
   @@unique([strategyId, chainId, protocol, assetAddress, positionType], map: "position_scope")
 }
 
 model OpportunitySnapshot {
-  id                String      @id @default(cuid())
-  strategyId        String
-  chainId           Int
-  chainKey          String
-  protocol          String
-  poolId            String
-  assetSymbol       String
-  assetAddress      String
-  apy               Float
-  score             Float
-  tvlUsd            Float
-  riskPenalty       Float
-  metadata          Json
-  capturedAt        DateTime    @default(now())
-  strategy          Strategy    @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  strategyId   String
+  chainId      Int
+  chainKey     String
+  protocol     String
+  poolId       String
+  assetSymbol  String
+  assetAddress String
+  apy          Float
+  score        Float
+  tvlUsd       Float
+  riskPenalty  Float
+  metadata     Json
+  capturedAt   DateTime @default(now())
+  strategy     Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
 }
 
 model RebalanceDecision {
-  id                   String          @id @default(cuid())
-  strategyId           String
-  agentRunId           String?
-  status               DecisionStatus  @default(NO_ACTION)
-  summary              String
-  reason               String
-  sourceChainId        Int?
-  destinationChainId   Int?
-  sourceProtocol       String?
-  destinationProtocol  String?
-  sourceAsset          String?
-  destinationAsset     String?
-  amount               String?
-  amountUsd            Float?
-  estimatedApyDelta    Float?
+  id                     String              @id @default(cuid())
+  strategyId             String
+  agentRunId             String?
+  status                 DecisionStatus      @default(NO_ACTION)
+  summary                String
+  reason                 String
+  sourceChainId          Int?
+  destinationChainId     Int?
+  sourceProtocol         String?
+  destinationProtocol    String?
+  sourceAsset            String?
+  destinationAsset       String?
+  amount                 String?
+  amountUsd              Float?
+  estimatedApyDelta      Float?
   estimatedNetBenefitUsd Float?
-  bridgeCostUsd        Float?
-  gasCostUsd           Float?
-  slippageBps          Int?
-  scoreBreakdown       Json
-  actionPlan           Json
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  strategy             Strategy        @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  agentRun             AgentRun?       @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
-  approvalRequests     ApprovalRequest[]
-  transactionRecords   TransactionRecord[]
+  bridgeCostUsd          Float?
+  gasCostUsd             Float?
+  slippageBps            Int?
+  scoreBreakdown         Json
+  actionPlan             Json
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  strategy               Strategy            @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentRun               AgentRun?           @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  approvalRequests       ApprovalRequest[]
+  transactionRecords     TransactionRecord[]
 }
 
 model ApprovalRequest {
-  id                 String          @id @default(cuid())
-  userId             String
-  strategyId         String
+  id                  String              @id @default(cuid())
+  userId              String
+  strategyId          String
   rebalanceDecisionId String
-  status             ApprovalStatus  @default(PENDING)
-  approvalKind       String
-  requestedAction    Json
-  transactionPlan    Json
-  expiresAt          DateTime?
-  approvedAt         DateTime?
-  rejectedAt         DateTime?
-  executedAt         DateTime?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  strategy           Strategy        @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  rebalanceDecision  RebalanceDecision @relation(fields: [rebalanceDecisionId], references: [id], onDelete: Cascade)
-  transactionRecords TransactionRecord[]
+  status              ApprovalStatus      @default(PENDING)
+  approvalKind        String
+  requestedAction     Json
+  transactionPlan     Json
+  expiresAt           DateTime?
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  executedAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy            Strategy            @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  rebalanceDecision   RebalanceDecision   @relation(fields: [rebalanceDecisionId], references: [id], onDelete: Cascade)
+  transactionRecords  TransactionRecord[]
 }
 
 model ExecutionLog {
-  id                 String      @id @default(cuid())
-  userId             String
-  strategyId         String?
-  agentRunId         String?
-  level              String
-  message            String
-  context            Json
-  createdAt          DateTime    @default(now())
-  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  strategyId String?
+  agentRunId String?
+  level      String
+  message    String
+  context    Json
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model TransactionRecord {
-  id                 String             @id @default(cuid())
+  id                  String             @id @default(cuid())
   rebalanceDecisionId String?
-  approvalRequestId  String?
-  stepKey            String
-  transactionType    String
-  chainId            Int
-  toAddress          String
-  data               String?
-  value              String?
-  spenderAddress     String?
-  hash               String?
-  status             TransactionStatus  @default(PENDING)
-  metadata           Json
-  submittedAt        DateTime?
-  confirmedAt        DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  rebalanceDecision  RebalanceDecision? @relation(fields: [rebalanceDecisionId], references: [id], onDelete: SetNull)
-  approvalRequest    ApprovalRequest?   @relation(fields: [approvalRequestId], references: [id], onDelete: SetNull)
+  approvalRequestId   String?
+  stepKey             String
+  transactionType     String
+  chainId             Int
+  toAddress           String
+  data                String?
+  value               String?
+  spenderAddress      String?
+  hash                String?
+  status              TransactionStatus  @default(PENDING)
+  metadata            Json
+  submittedAt         DateTime?
+  confirmedAt         DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  rebalanceDecision   RebalanceDecision? @relation(fields: [rebalanceDecisionId], references: [id], onDelete: SetNull)
+  approvalRequest     ApprovalRequest?   @relation(fields: [approvalRequestId], references: [id], onDelete: SetNull)
 }
 
 model AgentRun {
-  id                  String        @id @default(cuid())
-  userId              String
-  strategyId          String
-  status              RunStatus     @default(RUNNING)
-  startedAt           DateTime      @default(now())
-  completedAt         DateTime?
-  summary             String?
-  agentMode           String
-  inputs              Json
-  outputs             Json?
-  error               String?
-  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  strategy            Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  decisions           RebalanceDecision[]
-  agentCycles         AgentCycle[]
+  id          String              @id @default(cuid())
+  userId      String
+  strategyId  String
+  status      RunStatus           @default(RUNNING)
+  startedAt   DateTime            @default(now())
+  completedAt DateTime?
+  summary     String?
+  agentMode   String
+  inputs      Json
+  outputs     Json?
+  error       String?
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy    Strategy            @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  decisions   RebalanceDecision[]
+  agentCycles AgentCycle[]
 }
 
 model AgentCycle {
-  id                  String                       @id @default(cuid())
-  userId              String
-  strategyId          String
-  agentRunId          String?
-  status              RunStatus                    @default(RUNNING)
-  strategyKey         String
-  summary             String?
-  liveExecutionEnabled Boolean                     @default(false)
-  maxReasoningSteps   Int
-  maxActionsPerCycle  Int
-  startedAt           DateTime                     @default(now())
-  completedAt         DateTime?
-  inputs              Json
-  outputs             Json?
-  error               String?
-  user                User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  strategy            Strategy                     @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  agentRun            AgentRun?                    @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
-  actionRequests      ActionRequest[]
-  protocolLogs        ProtocolLog[]
-  decisionTraces      DecisionTrace[]
+  id                   String          @id @default(cuid())
+  userId               String
+  strategyId           String
+  agentRunId           String?
+  status               RunStatus       @default(RUNNING)
+  strategyKey          String
+  summary              String?
+  liveExecutionEnabled Boolean         @default(false)
+  maxReasoningSteps    Int
+  maxActionsPerCycle   Int
+  startedAt            DateTime        @default(now())
+  completedAt          DateTime?
+  inputs               Json
+  outputs              Json?
+  error                String?
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy             Strategy        @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentRun             AgentRun?       @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  actionRequests       ActionRequest[]
+  protocolLogs         ProtocolLog[]
+  decisionTraces       DecisionTrace[]
 
   @@index([strategyId, startedAt])
 }
 
 model ActionRequest {
-  id                   String             @id @default(cuid())
-  userId               String
-  strategyId           String
-  agentCycleId         String
-  kind                 String
-  protocol             String
-  chainId              Int
-  status               ActionStatus       @default(PENDING)
-  sponsorshipStatus    SponsorshipStatus  @default(NOT_REQUESTED)
-  title                String
-  amountUsd            Float?
-  assetSymbol          String?
-  request              Json
-  quote                Json?
-  validation           Json?
-  simulation           Json?
-  result               Json?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  strategy             Strategy           @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  agentCycle           AgentCycle         @relation(fields: [agentCycleId], references: [id], onDelete: Cascade)
-  executions           ActionExecution[]
-  protocolLogs         ProtocolLog[]
+  id                String            @id @default(cuid())
+  userId            String
+  strategyId        String
+  agentCycleId      String
+  kind              String
+  protocol          String
+  chainId           Int
+  status            ActionStatus      @default(PENDING)
+  sponsorshipStatus SponsorshipStatus @default(NOT_REQUESTED)
+  title             String
+  amountUsd         Float?
+  assetSymbol       String?
+  request           Json
+  quote             Json?
+  validation        Json?
+  simulation        Json?
+  result            Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy          Strategy          @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentCycle        AgentCycle        @relation(fields: [agentCycleId], references: [id], onDelete: Cascade)
+  executions        ActionExecution[]
+  protocolLogs      ProtocolLog[]
 
   @@index([strategyId, createdAt])
   @@index([agentCycleId, createdAt])
 }
 
 model ActionExecution {
-  id                   String             @id @default(cuid())
-  actionRequestId      String
-  status               ActionStatus       @default(PENDING)
-  walletProvider       String
-  gasSponsored         Boolean            @default(false)
-  sponsorshipStatus    SponsorshipStatus  @default(NOT_REQUESTED)
-  transactionHash      String?
-  explorerUrl          String?
-  sponsorMetadata      Json?
-  executionPayload     Json?
-  result               Json?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  actionRequest        ActionRequest      @relation(fields: [actionRequestId], references: [id], onDelete: Cascade)
+  id                String            @id @default(cuid())
+  actionRequestId   String
+  status            ActionStatus      @default(PENDING)
+  walletProvider    String
+  gasSponsored      Boolean           @default(false)
+  sponsorshipStatus SponsorshipStatus @default(NOT_REQUESTED)
+  transactionHash   String?
+  explorerUrl       String?
+  sponsorMetadata   Json?
+  executionPayload  Json?
+  result            Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  actionRequest     ActionRequest     @relation(fields: [actionRequestId], references: [id], onDelete: Cascade)
 }
 
 model ProtocolLog {
-  id                   String        @id @default(cuid())
-  strategyId           String
-  agentCycleId         String?
-  actionRequestId      String?
-  protocol             String
-  event                String
-  level                String
-  payload              Json
-  createdAt            DateTime      @default(now())
-  strategy             Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  agentCycle           AgentCycle?   @relation(fields: [agentCycleId], references: [id], onDelete: SetNull)
-  actionRequest        ActionRequest? @relation(fields: [actionRequestId], references: [id], onDelete: SetNull)
+  id              String         @id @default(cuid())
+  strategyId      String
+  agentCycleId    String?
+  actionRequestId String?
+  protocol        String
+  event           String
+  level           String
+  payload         Json
+  createdAt       DateTime       @default(now())
+  strategy        Strategy       @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  agentCycle      AgentCycle?    @relation(fields: [agentCycleId], references: [id], onDelete: SetNull)
+  actionRequest   ActionRequest? @relation(fields: [actionRequestId], references: [id], onDelete: SetNull)
 }
 
 model DecisionTrace {
-  id                   String        @id @default(cuid())
-  agentCycleId         String
-  step                 String
-  message              String
-  payload              Json
-  createdAt            DateTime      @default(now())
-  agentCycle           AgentCycle    @relation(fields: [agentCycleId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  agentCycleId String
+  step         String
+  message      String
+  payload      Json
+  createdAt    DateTime   @default(now())
+  agentCycle   AgentCycle @relation(fields: [agentCycleId], references: [id], onDelete: Cascade)
 
   @@index([agentCycleId, createdAt])
 }
 
 model CircuitBreakerState {
-  id                   String        @id @default(cuid())
-  strategyId           String        @unique
-  failureCount         Int           @default(0)
-  successCount         Int           @default(0)
-  isOpen               Boolean       @default(false)
-  windowStartedAt      DateTime      @default(now())
-  openedAt             DateTime?
-  reason               String?
-  metadata             Json?
-  updatedAt            DateTime      @updatedAt
-  strategy             Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  id              String    @id @default(cuid())
+  strategyId      String    @unique
+  failureCount    Int       @default(0)
+  successCount    Int       @default(0)
+  isOpen          Boolean   @default(false)
+  windowStartedAt DateTime  @default(now())
+  openedAt        DateTime?
+  reason          String?
+  metadata        Json?
+  updatedAt       DateTime  @updatedAt
+  strategy        Strategy  @relation(fields: [strategyId], references: [id], onDelete: Cascade)
 }
 
 model ExecutionCapabilitySnapshot {
-  id                   String        @id @default(cuid())
-  strategyId           String
-  chainId              Int
-  protocol             String
-  actionKind           String
-  walletProvider       String
+  id                      String   @id @default(cuid())
+  strategyId              String
+  chainId                 Int
+  protocol                String
+  actionKind              String
+  walletProvider          String
   gasSponsorshipSupported Boolean
-  smartAccountSupported Boolean
-  eip7702Supported     Boolean
-  details              Json
-  capturedAt           DateTime      @default(now())
-  strategy             Strategy      @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  smartAccountSupported   Boolean
+  eip7702Supported        Boolean
+  details                 Json
+  capturedAt              DateTime @default(now())
+  strategy                Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
 
   @@index([strategyId, capturedAt])
 }
 
+model ResearchSignal {
+  id              String           @id @default(cuid())
+  agentKey        String
+  offeringKey     String
+  query           String?
+  walletAddress   String?
+  tokenAddress    String?
+  chainKey        String?
+  signal          String
+  summary         String
+  confidence      Float
+  timeHorizon     String
+  supportingFacts Json
+  risks           Json
+  input           Json
+  output          Json
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  launchAnalyses  LaunchAnalysis[]
+  whaleAlerts     WhaleAlert[]
+
+  @@index([agentKey, createdAt])
+  @@index([offeringKey, createdAt])
+}
+
+model LaunchAnalysis {
+  id                String          @id @default(cuid())
+  query             String
+  chainKey          String?
+  tokenAddress      String?
+  pairAddress       String?
+  dexId             String?
+  label             String
+  priceUsd          Float?
+  liquidityUsd      Float?
+  volume24hUsd      Float?
+  priceChange24hPct Float?
+  pairCreatedAt     DateTime?
+  sourceUrl         String?
+  metadata          Json
+  signalId          String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  signal            ResearchSignal? @relation(fields: [signalId], references: [id], onDelete: SetNull)
+
+  @@index([query, createdAt])
+  @@index([tokenAddress, createdAt])
+}
+
+model WhaleAlert {
+  id            String          @id @default(cuid())
+  label         String
+  walletAddress String
+  chainKey      String
+  direction     String
+  tokenSymbol   String
+  tokenAddress  String?
+  amount        String
+  amountUsd     Float?
+  counterparty  String?
+  txHash        String
+  observedAt    DateTime
+  metadata      Json
+  signalId      String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  signal        ResearchSignal? @relation(fields: [signalId], references: [id], onDelete: SetNull)
+
+  @@unique([txHash, walletAddress, chainKey], map: "whale_alert_scope")
+  @@index([walletAddress, observedAt])
+  @@index([signalId, observedAt])
+}
+
+model TradePlanRecord {
+  id                 String   @id @default(cuid())
+  offeringKey        String
+  walletAddress      String
+  summary            String
+  policyAllowed      Boolean
+  requiresApproval   Boolean
+  sourceChainId      Int?
+  destinationChainId Int?
+  sourceAsset        String?
+  destinationAsset   String?
+  amount             String?
+  amountUsd          Float?
+  executionUrl       String
+  input              Json
+  output             Json
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([offeringKey, createdAt])
+  @@index([walletAddress, createdAt])
+}
+
+model AcpJobAudit {
+  id              String   @id @default(cuid())
+  agentKey        String
+  offeringKey     String?
+  acpJobId        String
+  phase           String?
+  status          String
+  buyerAddress    String?
+  providerAddress String?
+  requestPayload  Json?
+  responsePayload Json?
+  error           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([agentKey, acpJobId], map: "acp_job_audit_scope")
+  @@index([agentKey, createdAt])
+}
+
 model WorkerLease {
-  key                  String        @id
-  strategyId           String?
-  ownerId              String
-  expiresAt            DateTime
-  metadata             Json?
-  updatedAt            DateTime      @updatedAt
-  strategy             Strategy?     @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  key        String    @id
+  strategyId String?
+  ownerId    String
+  expiresAt  DateTime
+  metadata   Json?
+  updatedAt  DateTime  @updatedAt
+  strategy   Strategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
 }

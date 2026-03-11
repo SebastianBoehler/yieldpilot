@@ -7,18 +7,18 @@ import { SectionHeading } from "@/components/ui/section-heading";
 const highlights = [
   {
     icon: Bot,
-    title: "Generic action loop",
-    description: "Portfolio and market analysts still run through the ADK workflow, but execution now flows through a generic action model, protocol adapters, and a persistent cycle trace.",
+    title: "Virtuals ACP services",
+    description: "YieldPilot now exposes two ACP-first provider agents: one for structured crypto research and one for non-custodial trade planning.",
   },
   {
     icon: Waypoints,
-    title: "Gas-aware protocol execution",
-    description: "DEX, bridge, and lending actions run through adapter interfaces that price cost and compatibility first, then request sponsorship or fall back cleanly.",
+    title: "LI.FI routing",
+    description: "Spot swaps and bridge routes are planned through LI.FI, then serialized into dry-run transaction bundles and approval-gated execution handoff.",
   },
   {
     icon: ShieldCheck,
-    title: "Policy-first autonomy",
-    description: "Human approval and autonomous execution share the same hardcoded limits, simulations, circuit breaker, and audit trail.",
+    title: "Non-custodial by default",
+    description: "ACP jobs never directly execute user principal transfers. YieldPilot returns structured plans, signals, and resource endpoints with explicit guardrails.",
   },
 ];
 
@@ -30,60 +30,60 @@ export default function MarketingPage() {
           <div className="grid gap-10 lg:grid-cols-[1.35fr_0.85fr]">
             <div className="space-y-8 p-2">
               <p className="inline-flex rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-teal-200">
-                YieldPilot Main Agent
+                YieldPilot Virtuals ACP
               </p>
               <div className="space-y-5">
                 <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] tracking-tight lg:text-7xl">
-                  Autonomous onchain agent infrastructure with yield as the first live strategy.
+                  Virtuals-native crypto research and trade-planning services backed by YieldPilot.
                 </h1>
                 <p className="max-w-2xl text-lg leading-8 text-slate-300">
-                  YieldPilot now centers on a production-oriented action loop with gas-aware execution, protocol adapters, safety guards, and Railway deployment. The original yield optimizer remains live as the first strategy pack on top of that runtime.
+                  This repo now centers on an ACP-first provider runtime. YieldPilot exposes research outputs, whale-watch alerts, token launch analysis, and LI.FI-backed trade plans while keeping execution non-custodial and approval-gated.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <Link href="/arena">
+                <Link href="/api/virtuals/manifest">
                   <Button className="bg-white text-slate-950 hover:bg-slate-100">
-                    Open public arena
+                    Open ACP manifest
                     <ArrowRight className="ml-2 size-4" />
                   </Button>
                 </Link>
                 <Link href="/dashboard">
                   <Button variant="ghost" className="border border-white/20 text-white hover:bg-white/10">
-                    Open dashboard
+                    Open execution handoff
                   </Button>
                 </Link>
-                <Link href="/approvals">
+                <Link href="/api/virtuals/resources/methodology?agent=yieldpilot-research">
                   <Button variant="ghost" className="border border-white/20 text-white hover:bg-white/10">
-                    Review approval queue
+                    Open methodology
                   </Button>
                 </Link>
               </div>
             </div>
             <div className="grid gap-4">
               <Panel className="bg-white/10 text-white">
-                <p className="text-xs uppercase tracking-[0.24em] text-teal-200">Execution modes</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-teal-200">Provider agents</p>
                 <div className="mt-5 space-y-4">
                   <div>
-                    <h3 className="text-lg font-semibold">Human approval</h3>
+                    <h3 className="text-lg font-semibold">YieldPilot Research</h3>
                     <p className="mt-1 text-sm leading-6 text-slate-300">
-                      YieldPilot prepares the full action bundle, exposes every allowance change, and waits for approval before any live submission.
+                      Paid ACP research services for token launches, whale-watch alerts, and trade signal generation with strict JSON outputs.
                     </p>
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold">Autonomous</h3>
+                    <h3 className="text-lg font-semibold">YieldPilot Trade Planner</h3>
                     <p className="mt-1 text-sm leading-6 text-slate-300">
-                      A backend execution wallet can act on schedule inside daily limits, contract allowlists, simulation requirements, and circuit-breaker controls.
+                      Paid ACP planning services for spot swaps and rebalance plans that rely on LI.FI and YieldPilot policy checks but never take custody.
                     </p>
                   </div>
                 </div>
               </Panel>
               <Panel className="bg-linear-to-br from-teal-500/20 to-orange-400/20 text-white">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/70">What ships live in phase 1</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/70">What ships live in v1</p>
                 <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-100">
-                  <li>Yield-agent strategy using official Aave RPC data</li>
-                  <li>DEX and bridge routing through LI.FI adapters</li>
-                  <li>Hardcoded risk limits, simulations, and action caps</li>
-                  <li>Persistent cycle, action, and transaction audit records in Postgres</li>
+                  <li>Virtuals ACP worker with separate research and trade-planner agents</li>
+                  <li>DexScreener, CoinGecko, DefiLlama, RSS, and watchlist-based explorer inputs</li>
+                  <li>LI.FI-backed spot routing and YieldPilot rebalance plan generation</li>
+                  <li>Postgres-backed signal history, launch analysis, whale alerts, and ACP job audits</li>
                 </ul>
               </Panel>
             </div>
@@ -107,17 +107,17 @@ export default function MarketingPage() {
 
         <Panel>
           <SectionHeading
-            eyebrow="Execution loop"
-            title="How the main agent decides"
-            description="Each cycle starts with live position discovery, normalizes candidate actions, validates hard risk limits, simulates supported actions, and only then queues or executes the plan."
+            eyebrow="Service flow"
+            title="How the ACP provider responds"
+            description="Every ACP request is validated first, then routed into either the research pipeline or the trade planner. Both paths return structured JSON and preserve an audit trail."
           />
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {[
-              "Fetch live positions",
-              "Collect strategy signals",
-              "Quote protocol actions",
-              "Validate and simulate",
-              "Queue or execute",
+              "Accept ACP job",
+              "Normalize request",
+              "Fetch research or LI.FI data",
+              "Run policy or synthesis",
+              "Deliver structured JSON",
             ].map((step, index) => (
               <div key={step} className="rounded-[24px] border border-slate-200 bg-white px-5 py-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Step {index + 1}</p>

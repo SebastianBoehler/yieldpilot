@@ -7,6 +7,27 @@ const envSchema = z.object({
   GOOGLE_API_KEY: z.string().optional(),
   GOOGLE_GENAI_MODEL: z.string().default("gemini-2.5-flash"),
   LIFI_INTEGRATOR: z.string().default("YieldPilot"),
+  ACP_BASE_URL: z.string().url().default("http://localhost:3000"),
+  ACP_ENVIRONMENT: z.enum(["sandbox", "production"]).default("sandbox"),
+  ACP_BUILDER_CODE: z.string().optional(),
+  ACP_DEVELOPER_PRIVATE_KEY: z.string().regex(/^0x[a-fA-F0-9]{64}$/).optional(),
+  ACP_RESEARCH_AGENT_ENTITY_ID: z.coerce.number().int().positive().optional(),
+  ACP_RESEARCH_AGENT_WALLET_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+  ACP_TRADE_PLANNER_AGENT_ENTITY_ID: z.coerce.number().int().positive().optional(),
+  ACP_TRADE_PLANNER_AGENT_WALLET_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+  ACP_ANALYZE_TOKEN_LAUNCH_PRICE_USDC: z.coerce.number().positive().default(0.5),
+  ACP_DETECT_WHALE_MOVEMENTS_PRICE_USDC: z.coerce.number().positive().default(0.5),
+  ACP_GENERATE_TRADE_SIGNAL_PRICE_USDC: z.coerce.number().positive().default(0.75),
+  ACP_BUILD_SPOT_SWAP_PLAN_PRICE_USDC: z.coerce.number().positive().default(1),
+  ACP_BUILD_REBALANCE_PLAN_PRICE_USDC: z.coerce.number().positive().default(1.5),
+  ACP_TRACKED_WHALES: z.string().default("[]"),
+  ACP_DEXSCREENER_API_URL: z.string().url().default("https://api.dexscreener.com"),
+  ACP_ARBISCAN_API_URL: z.string().url().default("https://api.arbiscan.io/api"),
+  ACP_BASESCAN_API_URL: z.string().url().default("https://api.basescan.org/api"),
+  ACP_OPTIMISM_EXPLORER_API_URL: z.string().url().default("https://api-optimistic.etherscan.io/api"),
+  ACP_ARBISCAN_API_KEY: z.string().optional(),
+  ACP_BASESCAN_API_KEY: z.string().optional(),
+  ACP_OPTIMISM_EXPLORER_API_KEY: z.string().optional(),
   NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS: z.string().optional(),
   AGENT_PRIVATE_KEY: z.string().optional(),
   ARBITRUM_RPC_URL: z.string().url().default("https://arb1.arbitrum.io/rpc"),
@@ -35,6 +56,27 @@ export const env = envSchema.parse({
   GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
   GOOGLE_GENAI_MODEL: process.env.GOOGLE_GENAI_MODEL,
   LIFI_INTEGRATOR: process.env.LIFI_INTEGRATOR,
+  ACP_BASE_URL: process.env.ACP_BASE_URL,
+  ACP_ENVIRONMENT: process.env.ACP_ENVIRONMENT,
+  ACP_BUILDER_CODE: process.env.ACP_BUILDER_CODE,
+  ACP_DEVELOPER_PRIVATE_KEY: process.env.ACP_DEVELOPER_PRIVATE_KEY,
+  ACP_RESEARCH_AGENT_ENTITY_ID: process.env.ACP_RESEARCH_AGENT_ENTITY_ID,
+  ACP_RESEARCH_AGENT_WALLET_ADDRESS: process.env.ACP_RESEARCH_AGENT_WALLET_ADDRESS,
+  ACP_TRADE_PLANNER_AGENT_ENTITY_ID: process.env.ACP_TRADE_PLANNER_AGENT_ENTITY_ID,
+  ACP_TRADE_PLANNER_AGENT_WALLET_ADDRESS: process.env.ACP_TRADE_PLANNER_AGENT_WALLET_ADDRESS,
+  ACP_ANALYZE_TOKEN_LAUNCH_PRICE_USDC: process.env.ACP_ANALYZE_TOKEN_LAUNCH_PRICE_USDC,
+  ACP_DETECT_WHALE_MOVEMENTS_PRICE_USDC: process.env.ACP_DETECT_WHALE_MOVEMENTS_PRICE_USDC,
+  ACP_GENERATE_TRADE_SIGNAL_PRICE_USDC: process.env.ACP_GENERATE_TRADE_SIGNAL_PRICE_USDC,
+  ACP_BUILD_SPOT_SWAP_PLAN_PRICE_USDC: process.env.ACP_BUILD_SPOT_SWAP_PLAN_PRICE_USDC,
+  ACP_BUILD_REBALANCE_PLAN_PRICE_USDC: process.env.ACP_BUILD_REBALANCE_PLAN_PRICE_USDC,
+  ACP_TRACKED_WHALES: process.env.ACP_TRACKED_WHALES,
+  ACP_DEXSCREENER_API_URL: process.env.ACP_DEXSCREENER_API_URL,
+  ACP_ARBISCAN_API_URL: process.env.ACP_ARBISCAN_API_URL,
+  ACP_BASESCAN_API_URL: process.env.ACP_BASESCAN_API_URL,
+  ACP_OPTIMISM_EXPLORER_API_URL: process.env.ACP_OPTIMISM_EXPLORER_API_URL,
+  ACP_ARBISCAN_API_KEY: process.env.ACP_ARBISCAN_API_KEY,
+  ACP_BASESCAN_API_KEY: process.env.ACP_BASESCAN_API_KEY,
+  ACP_OPTIMISM_EXPLORER_API_KEY: process.env.ACP_OPTIMISM_EXPLORER_API_KEY,
   NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS: process.env.NEXT_PUBLIC_DEFAULT_WALLET_ADDRESS,
   AGENT_PRIVATE_KEY: process.env.AGENT_PRIVATE_KEY,
   ARBITRUM_RPC_URL: process.env.ARBITRUM_RPC_URL,
@@ -60,6 +102,13 @@ export const env = envSchema.parse({
 
 export const hasGoogleAdkCredentials = Boolean(env.GOOGLE_API_KEY);
 export const hasAgentWallet = Boolean(env.AGENT_PRIVATE_KEY);
+export const hasVirtualsAcpRuntimeConfig = Boolean(
+  env.ACP_DEVELOPER_PRIVATE_KEY &&
+    env.ACP_RESEARCH_AGENT_ENTITY_ID &&
+    env.ACP_RESEARCH_AGENT_WALLET_ADDRESS &&
+    env.ACP_TRADE_PLANNER_AGENT_ENTITY_ID &&
+    env.ACP_TRADE_PLANNER_AGENT_WALLET_ADDRESS,
+);
 export const hasSmartAccountConfig = Boolean(
   env.ENABLE_SMART_ACCOUNTS &&
     env.ERC4337_BUNDLER_RPC_URL &&

@@ -8,6 +8,7 @@ import { getArenaExternalFeeds } from "@/server/services/arena-service";
 import { createApprovalRequest, updateApprovalStatus } from "@/server/services/approval-service";
 import { getDisplayIndexes } from "@/server/services/index-service";
 import { createExecutionLog, ensureUserStrategy, persistOpportunitySnapshots, persistPositions, toStrategyPolicy } from "@/server/services/strategy-service";
+import { buildExecutionPlanFromActionResults } from "@/server/services/trade-plan-serializer";
 import type { AgentCycleActionResult } from "@/agent/types";
 
 async function persistDecisionTransactionPlan(rebalanceDecisionId: string, executionPlan: ExecutionPlan) {
@@ -25,42 +26,6 @@ async function persistDecisionTransactionPlan(rebalanceDecisionId: string, execu
       metadata: step.metadata as Prisma.JsonObject,
     })),
   });
-}
-
-function buildExecutionPlanFromActions(actions: AgentCycleActionResult[], cycleResult: Awaited<ReturnType<typeof runAutonomousAgentCycle>>): ExecutionPlan | undefined {
-  if (!cycleResult.candidate) {
-    return undefined;
-  }
-
-  const txSteps = actions.flatMap((action) => action.plannedBundle?.txSteps ?? []);
-  if (!txSteps.length) {
-    return undefined;
-  }
-
-  return {
-    routeId: cycleResult.candidate.routeCost.routeId,
-    sourceChainId: cycleResult.candidate.sourcePosition.chainId,
-    destinationChainId: cycleResult.candidate.destinationOpportunity.chainId,
-    sourceProtocol: cycleResult.candidate.sourcePosition.protocolLabel,
-    destinationProtocol: cycleResult.candidate.destinationOpportunity.protocolLabel,
-    sourceAsset: cycleResult.candidate.sourcePosition.assetSymbol,
-    destinationAsset: cycleResult.candidate.destinationOpportunity.assetSymbol,
-    amount: cycleResult.candidate.amount.toString(),
-    amountUsd: cycleResult.candidate.amountUsd,
-    expectedApyDelta: cycleResult.candidate.expectedApyDelta,
-    expectedNetBenefitUsd: cycleResult.candidate.expectedNetBenefitUsd,
-    bridgeCostUsd: cycleResult.candidate.routeCost.bridgeCostUsd,
-    gasCostUsd:
-      cycleResult.candidate.routeCost.gasCostUsd +
-      txSteps.reduce((sum, step) => sum + (step.estimatedGasUsd ?? 0), 0),
-    slippageBps: Math.round(cycleResult.candidate.scoreBreakdown.slippagePenalty * 100),
-    rationale: cycleResult.candidate.rationale,
-    routeTool:
-      actions.find((action) => action.request.protocol === "lifi")?.plannedBundle?.routeTool ??
-      cycleResult.candidate.routeCost.tool,
-    routeSummary: cycleResult.candidate.routeCost.routeLabel,
-    txSteps,
-  };
 }
 
 function buildPolicyResult(params: {
@@ -176,7 +141,7 @@ export async function runAgentCycle(walletAddress?: string): Promise<AgentCycleR
       policy,
       agentRunId: agentRun.id,
     });
-    const executionPlan = buildExecutionPlanFromActions(cycleResult.actions, cycleResult);
+    const executionPlan = buildExecutionPlanFromActionResults(cycleResult.actions, cycleResult.candidate);
     const policyResult = buildPolicyResult({
       policyMode: base.strategy.mode,
       executionPlan,
